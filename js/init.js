@@ -68,6 +68,8 @@ function init() {
   resetView();
   updateStats();
   updateProfileBtn();
+  // Start preloading all city boundaries
+  preloadAllCityBoundaries();
 }
 
 // Init on DOM ready

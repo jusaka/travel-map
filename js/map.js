@@ -237,12 +237,7 @@ function draw() {
 
   // ========== PASS 3: City boundaries (zoom > 3x) ==========
   if (zoomLevel > 3) {
-    // Trigger loading for visible provinces
     var visProvs = getVisibleProvinces();
-    for (var vpi = 0; vpi < visProvs.length; vpi++) {
-      loadCityBoundaries(visProvs[vpi]);
-    }
-    
     var cityBorderAlpha = Math.min(0.5, (zoomLevel - 3) * 0.15);
     
     for (var vpi = 0; vpi < visProvs.length; vpi++) {
@@ -512,6 +507,32 @@ function isInsideChina(mx, my) {
 
 function findCityAt(mx, my) {
   if (!isInsideChina(mx, my)) return null;
+  
+  // If city boundaries are loaded, use point-in-polygon for precise detection
+  var prov = findProvinceAt(mx, my);
+  if (prov) {
+    var cityBounds = getCityBoundaries(prov.n);
+    if (cityBounds) {
+      for (var i = 0; i < cityBounds.length; i++) {
+        var cb = cityBounds[i];
+        for (var gi = 0; gi < cb.p.length; gi++) {
+          var ring = cb.p[gi][0]; // outer ring
+          var pts = ring.map(function(c) { return lngLatToXY(c[0], c[1]); });
+          if (pointInRing(pts, mx, my)) {
+            // Found the city boundary - match to CITIES array
+            var cityObj = CITIES.find(function(c) { return c.n === cb.n || c.n === cb.n + '市'; });
+            if (cityObj) return cityObj;
+            // Fallback: find nearest city within this province
+            return findNearestCityInProv(mx, my, prov.n);
+          }
+        }
+      }
+      // Clicked inside province but no city boundary matched (gaps in data)
+      return findNearestCityInProv(mx, my, prov.n);
+    }
+  }
+  
+  // Fallback: nearest city (no boundary data loaded yet)
   return findNearestCity(mx, my);
 }
 

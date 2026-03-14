@@ -101,6 +101,9 @@ var PROV_ADCODE = {
 // Cache: provName → { arcs: [], cities: [{n, c, t, a}] } (decoded polygons)
 var _cityBoundaryCache = {};
 var _cityBoundaryLoading = {}; // provName → true if loading
+var _cityBoundaryTotal = Object.keys(PROV_ADCODE).length; // 31
+var _cityBoundaryLoaded = 0;
+var _cityBoundaryReady = false; // all loaded
 
 function loadCityBoundaries(provName) {
   if (_cityBoundaryCache[provName] || _cityBoundaryLoading[provName]) return;
@@ -111,7 +114,6 @@ function loadCityBoundaries(provName) {
   fetch('data/cities/' + adcode + '.json')
     .then(function(r) { return r.json(); })
     .then(function(data) {
-      // Decode city boundaries
       var decoded = [];
       for (var i = 0; i < data.cities.length; i++) {
         var city = data.cities[i];
@@ -124,11 +126,47 @@ function loadCityBoundaries(provName) {
       }
       _cityBoundaryCache[provName] = decoded;
       delete _cityBoundaryLoading[provName];
-      draw(); // Re-render with city boundaries
+      _cityBoundaryLoaded++;
+      updateLoadingProgress();
+      draw();
     })
     .catch(function() {
       delete _cityBoundaryLoading[provName];
+      _cityBoundaryLoaded++;
+      updateLoadingProgress();
     });
+}
+
+function updateLoadingProgress() {
+  var bar = document.getElementById('loadingBar');
+  var text = document.getElementById('loadingText');
+  if (!bar) return;
+  var pct = Math.round(_cityBoundaryLoaded / _cityBoundaryTotal * 100);
+  bar.style.width = pct + '%';
+  if (text) text.textContent = '加载城市数据 ' + _cityBoundaryLoaded + '/' + _cityBoundaryTotal;
+  if (_cityBoundaryLoaded >= _cityBoundaryTotal) {
+    _cityBoundaryReady = true;
+    var container = document.getElementById('loadingIndicator');
+    if (container) {
+      container.style.transition = 'opacity 0.5s';
+      container.style.opacity = '0';
+      setTimeout(function() { container.style.display = 'none'; }, 500);
+    }
+  }
+}
+
+function preloadAllCityBoundaries() {
+  var names = Object.keys(PROV_ADCODE);
+  // Stagger loads to avoid flooding
+  for (var i = 0; i < names.length; i++) {
+    (function(name, delay) {
+      setTimeout(function() { loadCityBoundaries(name); }, delay);
+    })(names[i], i * 50); // 50ms apart
+  }
+}
+
+function areCityBoundariesReady() {
+  return _cityBoundaryReady;
 }
 
 function decodeCityGeom(city, arcs) {
