@@ -39,8 +39,14 @@ function setupEvents() {
       if (mode === 'city') {
         var city = findCityAt(mxy[0], mxy[1]);
         var newHovered = city ? city.n : null;
-        if (newHovered !== hoveredCity) {
+        var newHoveredP = null;
+        if (city) {
+          // Also highlight the province
+          newHoveredP = city.p;
+        }
+        if (newHovered !== hoveredCity || newHoveredP !== hoveredProvince) {
           hoveredCity = newHovered;
+          hoveredProvince = newHoveredP;
           canvas.style.cursor = city ? 'pointer' : 'grab';
           draw();
         }
