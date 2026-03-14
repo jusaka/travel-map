@@ -111,13 +111,11 @@ canvas{display:block;width:100%;height:100%}
 <div class="toolbar">
   <span class="emoji">🗺️</span>
   <button class="profile-btn" onclick="showProfileModal()" title="切换用户"><span class="avatar">👤</span><span id="profileBtnName">默认用户</span></button>
-  </div>
   <div class="search-box">
     <input id="searchInput" type="text" placeholder="搜索城市..." oninput="onSearch(this.value)" onfocus="onSearch(this.value)">
     <div id="searchResults" class="search-results"></div>
   </div>
   <button class="btn-icon" onclick="showIOPanel()" title="导入/导出">💾</button>
-  <button class="btn-icon" onclick="resetView()" title="重置视图">🏠</button>
 </div>
 
 <canvas id="mapCanvas"></canvas>
