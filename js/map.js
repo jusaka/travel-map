@@ -352,20 +352,28 @@ function draw() {
   // ========== PASS 5: Labels with collision detection ==========
   var usedRects = [];
 
-  // Province labels
+  // Province labels — sort by priority so important ones get placed first
   var showAllProvLabels = zoomLevel >= 1.5;
   var provLabelFade = zoomLevel > 3;
 
+  // Build sortable province label list
+  var provLabels = [];
   for (var pi = 0; pi < provinces.length; pi++) {
     var prov = provinces[pi];
     if (!prov.c) continue;
     if (!isPolygonInView(prov, cw, ch)) continue;
-
     var vc = getProvinceVisitCount(prov.n);
     var hasVisited = vc.visited > 0;
-
     var isLarge = LARGE_PROVINCES.indexOf(prov.n) >= 0;
     if (!showAllProvLabels && !isLarge) continue;
+    provLabels.push({ pi: pi, prov: prov, vc: vc, hasVisited: hasVisited, isLarge: isLarge,
+      priority: (hasVisited ? 4 : 0) + (isLarge ? 2 : 0) });
+  }
+  provLabels.sort(function(a, b) { return b.priority - a.priority; });
+
+  for (var li = 0; li < provLabels.length; li++) {
+    var item = provLabels[li];
+    var prov = item.prov;
 
     var cxy = lngLatToXY(prov.c[0], prov.c[1]);
     var csxy = mapToScreen(cxy[0], cxy[1]);
@@ -382,18 +390,19 @@ function draw() {
       if (zoomLevel > 6) continue;
     }
 
-    ctx.font = (hasVisited ? 'bold ' : '') + fontSize + 'px "PingFang SC","Microsoft YaHei",sans-serif';
+    ctx.font = (item.hasVisited ? 'bold ' : '') + fontSize + 'px "PingFang SC","Microsoft YaHei",sans-serif';
     var tw = ctx.measureText(prov.n).width;
     var th = fontSize * 1.3;
+    // Extra padding to reduce crowding
+    var pad = zoomLevel < 2 ? 10 : 6;
 
-    var priority = (hasVisited ? 2 : 0) + (isLarge ? 1 : 0);
-    if (priority < 2 && !labelFits(usedRects, csxy[0], csxy[1], tw + 6, th + 4)) continue;
-    if (priority >= 2) labelFits(usedRects, csxy[0], csxy[1], tw + 6, th + 4);
+    if (item.priority < 4 && !labelFits(usedRects, csxy[0], csxy[1], tw + pad, th + pad)) continue;
+    if (item.priority >= 4) labelFits(usedRects, csxy[0], csxy[1], tw + pad, th + pad);
 
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
-    if (hasVisited) {
+    if (item.hasVisited) {
       ctx.fillStyle = zoomLevel < 2
         ? 'rgba(255,255,255,' + alpha + ')'
         : 'rgba(240,180,120,' + (0.8 * alpha) + ')';
@@ -402,11 +411,11 @@ function draw() {
     }
     ctx.fillText(prov.n, csxy[0], csxy[1]);
 
-    if (zoomLevel < 2 && hasVisited) {
+    if (zoomLevel < 2 && item.hasVisited) {
       ctx.font = (fontSize - 2) + 'px sans-serif';
       ctx.fillStyle = 'rgba(240,160,96,' + (0.9 * alpha) + ')';
-      ctx.fillText(vc.visited + '/' + vc.total, csxy[0], csxy[1] + fontSize + 2);
-      labelFits(usedRects, csxy[0], csxy[1] + fontSize + 2, ctx.measureText(vc.visited + '/' + vc.total).width + 4, fontSize);
+      ctx.fillText(item.vc.visited + '/' + item.vc.total, csxy[0], csxy[1] + fontSize + 2);
+      labelFits(usedRects, csxy[0], csxy[1] + fontSize + 2, ctx.measureText(item.vc.visited + '/' + item.vc.total).width + 4, fontSize);
     }
   }
 

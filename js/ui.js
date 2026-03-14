@@ -122,13 +122,18 @@ function updateStats() {
   document.getElementById('progressFill').style.width = pct + '%';
 
   var rank, emoji;
-  if (pct === 0) { rank = '家里蹲'; emoji = '🏠'; }
-  else if (pct < 5) { rank = '家里蹲'; emoji = '🏠'; }
-  else if (pct < 20) { rank = '初出茅庐'; emoji = '🚶'; }
-  else if (pct < 40) { rank = '行者'; emoji = '🎒'; }
-  else if (pct < 60) { rank = '旅行达人'; emoji = '✈️'; }
-  else if (pct < 80) { rank = '走遍中国'; emoji = '🗺️'; }
-  else { rank = '地理大师'; emoji = '👑'; }
+  if (visitedCities === 0) { rank = '家里蹲'; emoji = '🏠'; }
+  else if (visitedCities <= 3) { rank = '出门遛弯'; emoji = '🚶'; }
+  else if (visitedCities <= 8) { rank = '小有出行'; emoji = '👟'; }
+  else if (visitedCities <= 15) { rank = '初出茅庐'; emoji = '🎒'; }
+  else if (visitedCities <= 30) { rank = '渐入佳境'; emoji = '🚄'; }
+  else if (visitedCities <= 50) { rank = '行者无疆'; emoji = '✈️'; }
+  else if (visitedCities <= 80) { rank = '旅行达人'; emoji = '🌏'; }
+  else if (visitedCities <= 120) { rank = '走南闯北'; emoji = '🧭'; }
+  else if (visitedCities <= 180) { rank = '半壁江山'; emoji = '🗺️'; }
+  else if (visitedCities <= 250) { rank = '走遍中国'; emoji = '🏔️'; }
+  else if (visitedCities <= 330) { rank = '地理大师'; emoji = '🎓'; }
+  else { rank = '全境制霸'; emoji = '👑'; }
 
   document.getElementById('rankTitle').textContent = rank;
   document.getElementById('rankBadge').textContent = emoji + ' ' + rank;
@@ -432,12 +437,18 @@ function shareMapImage() {
     var pct = Math.round(visitedCities / totalCities * 100);
 
     var rank;
-    if (pct < 5) rank = '🏠 家里蹲';
-    else if (pct < 20) rank = '🚶 初出茅庐';
-    else if (pct < 40) rank = '🎒 行者';
-    else if (pct < 60) rank = '✈️ 旅行达人';
-    else if (pct < 80) rank = '🗺️ 走遍中国';
-    else rank = '👑 地理大师';
+    if (visitedCities === 0) rank = '🏠 家里蹲';
+    else if (visitedCities <= 3) rank = '🚶 出门遛弯';
+    else if (visitedCities <= 8) rank = '👟 小有出行';
+    else if (visitedCities <= 15) rank = '🎒 初出茅庐';
+    else if (visitedCities <= 30) rank = '🚄 渐入佳境';
+    else if (visitedCities <= 50) rank = '✈️ 行者无疆';
+    else if (visitedCities <= 80) rank = '🌏 旅行达人';
+    else if (visitedCities <= 120) rank = '🧭 走南闯北';
+    else if (visitedCities <= 180) rank = '🗺️ 半壁江山';
+    else if (visitedCities <= 250) rank = '🏔️ 走遍中国';
+    else if (visitedCities <= 330) rank = '🎓 地理大师';
+    else rank = '👑 全境制霸';
 
     var statsY = mapY + mapH + 40;
     cx.fillStyle = '#e0e0e0';
