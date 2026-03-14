@@ -128,8 +128,154 @@ function toggleStats() {
 }
 
 // Import/Export
-function showIOPanel() { document.getElementById('ioPanel').classList.add('show'); }
+function showIOPanel() {
+  document.getElementById('ioPanel').classList.add('show');
+  document.getElementById('ioText').value = '';
+  // Show share button if Web Share API available
+  if (navigator.share) {
+    document.getElementById('shareBtn').style.display = 'inline-block';
+  }
+}
 function closeIOPanel() { document.getElementById('ioPanel').classList.remove('show'); }
+
+// ====== 紧凑编码 ======
+// 362个城市 → bitmap (46 bytes) → Base64 (62 chars)
+// 格式: "TM1:" + base64(bitmap) + 备注部分(可选)
+// 备注格式: "|" + 索引:备注 用 ";" 分隔
+
+function encodeBitmap() {
+  var bits = new Uint8Array(Math.ceil(CITIES.length / 8));
+  for (var i = 0; i < CITIES.length; i++) {
+    if (visited[CITIES[i].n]) {
+      bits[i >> 3] |= (1 << (i & 7));
+    }
+  }
+  // Convert to base64
+  var binary = '';
+  for (var i = 0; i < bits.length; i++) {
+    binary += String.fromCharCode(bits[i]);
+  }
+  return btoa(binary);
+}
+
+function decodeBitmap(b64) {
+  var binary = atob(b64);
+  var result = {};
+  for (var i = 0; i < CITIES.length; i++) {
+    var byte = binary.charCodeAt(i >> 3);
+    if (byte & (1 << (i & 7))) {
+      result[CITIES[i].n] = { note: '', time: Date.now() };
+    }
+  }
+  return result;
+}
+
+function encodeNotes() {
+  var parts = [];
+  for (var i = 0; i < CITIES.length; i++) {
+    var v = visited[CITIES[i].n];
+    if (v && v.note) {
+      // URL-encode notes to handle special chars
+      parts.push(i + ':' + encodeURIComponent(v.note));
+    }
+  }
+  return parts.length ? '|' + parts.join(';') : '';
+}
+
+function decodeNotes(str, result) {
+  if (!str) return;
+  var parts = str.split(';');
+  for (var j = 0; j < parts.length; j++) {
+    var sep = parts[j].indexOf(':');
+    if (sep < 0) continue;
+    var idx = parseInt(parts[j].substring(0, sep));
+    var note = decodeURIComponent(parts[j].substring(sep + 1));
+    if (idx >= 0 && idx < CITIES.length && result[CITIES[idx].n]) {
+      result[CITIES[idx].n].note = note;
+    }
+  }
+}
+
+function exportCompact() {
+  var code = 'TM1:' + encodeBitmap() + encodeNotes();
+  var textarea = document.getElementById('ioText');
+  textarea.value = code;
+  textarea.select();
+  // Try to copy
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(code).then(function() {
+      showToast('📋 已复制到剪贴板！');
+    }).catch(function() {
+      showToast('📋 已生成，请手动复制');
+    });
+  } else {
+    document.execCommand('copy');
+    showToast('📋 已复制到剪贴板！');
+  }
+}
+
+function importCompact() {
+  var text = document.getElementById('ioText').value.trim();
+  if (!text) {
+    // Try to read from clipboard
+    if (navigator.clipboard && navigator.clipboard.readText) {
+      navigator.clipboard.readText().then(function(t) {
+        if (t && t.startsWith('TM1:')) {
+          document.getElementById('ioText').value = t;
+          doImportCompact(t);
+        } else {
+          showToast('❌ 剪贴板中没有有效的分享码');
+        }
+      }).catch(function() {
+        showToast('请粘贴分享码后点击导入');
+      });
+      return;
+    }
+    showToast('请粘贴分享码后点击导入');
+    return;
+  }
+  doImportCompact(text);
+}
+
+function doImportCompact(text) {
+  if (!text.startsWith('TM1:')) {
+    showToast('❌ 无效的分享码');
+    return;
+  }
+  var body = text.substring(4);
+  var notePart = '';
+  var pipeIdx = body.indexOf('|');
+  var bitmapB64;
+  if (pipeIdx >= 0) {
+    bitmapB64 = body.substring(0, pipeIdx);
+    notePart = body.substring(pipeIdx + 1);
+  } else {
+    bitmapB64 = body;
+  }
+  try {
+    var imported = decodeBitmap(bitmapB64);
+    decodeNotes(notePart, imported);
+    var count = Object.keys(imported).length;
+    pendingImportData = { visited: imported, profileName: '' };
+    document.getElementById('importOverwriteName').textContent = activeProfile;
+    document.getElementById('importChoiceModal').classList.add('show');
+    closeIOPanel();
+  } catch(e) {
+    showToast('❌ 分享码解析失败');
+  }
+}
+
+function shareData() {
+  var code = 'TM1:' + encodeBitmap() + encodeNotes();
+  var count = Object.keys(visited).length;
+  var provs = new Set(CITIES.filter(function(c) { return visited[c.n]; }).map(function(c) { return c.p; })).size;
+  navigator.share({
+    title: '我的中国旅行地图',
+    text: '🗺️ 我去过' + provs + '个省' + count + '座城市！\n\n' + code + '\n\n👉 https://jusaka.github.io/travel-map/'
+  }).then(function() {
+    showToast('📤 已分享！');
+  }).catch(function() {});
+}
 
 function exportData() {
   var data = { profileName: activeProfile, version: 2, visitedCities: visited, notes: {}, exportTime: new Date().toISOString() };
