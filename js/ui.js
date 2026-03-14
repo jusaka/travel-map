@@ -398,8 +398,9 @@ function generateShareCard() {
     var mapY = 100, mapH = 600;
     var mapScale = Math.min((cardW - 80), mapH);
 
-    for (var pi = 0; pi < PROVINCES.length; pi++) {
-      var prov = PROVINCES[pi];
+    var cardProvs = getDecodedProvinces();
+    for (var pi = 0; pi < cardProvs.length; pi++) {
+      var prov = cardProvs[pi];
       var vc = getProvinceVisitCount(prov.n);
       for (var gi = 0; gi < prov.p.length; gi++) {
         var polygon = prov.p[gi];

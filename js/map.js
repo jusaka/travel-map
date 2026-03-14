@@ -49,12 +49,12 @@ function mapToScreen(mx, my) {
   return [mx * viewScale + viewX, my * viewScale + viewY];
 }
 
-// Check if a bounding box of a polygon set is in viewport
-function isPolygonInView(province, W, H) {
-  var polys = province.p;
+// Check if a province bounding box is in viewport
+function isPolygonInView(prov, W, H) {
+  var polys = prov.p;
   var minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9;
   for (var pi = 0; pi < polys.length; pi++) {
-    var ring = polys[pi][0];
+    var ring = polys[pi][0]; // outer ring only for bbox
     for (var i = 0; i < ring.length; i += 3) {
       var xy = lngLatToXY(ring[i][0], ring[i][1]);
       var sxy = mapToScreen(xy[0], xy[1]);
@@ -87,7 +87,7 @@ function getProvinceVisitCount(provName) {
 // Pulse animation state
 var _pulsePhase = 0;
 
-// Helper: trace a province polygon path (one ring)
+// Helper: trace a ring path
 function traceRing(ctx, ring) {
   for (var i = 0; i < ring.length; i++) {
     var xy = lngLatToXY(ring[i][0], ring[i][1]);
@@ -125,9 +125,11 @@ function draw() {
   ctx.fillStyle = '#0d1117';
   ctx.fillRect(0, 0, cw, ch);
 
+  var provinces = getDecodedProvinces();
+
   // ========== PASS 1: Fill all provinces ==========
-  for (var pi = 0; pi < PROVINCES.length; pi++) {
-    var prov = PROVINCES[pi];
+  for (var pi = 0; pi < provinces.length; pi++) {
+    var prov = provinces[pi];
     if (!isPolygonInView(prov, cw, ch)) continue;
 
     var vc = getProvinceVisitCount(prov.n);
@@ -147,7 +149,6 @@ function draw() {
         } else if (hasVisited) {
           var intensity = vc.visited / vc.total;
           if (zoomLevel < 2) {
-            // 省份模式：更明显的打卡高亮
             ctx.fillStyle = 'rgba(224,112,80,' + (0.15 + intensity * 0.55) + ')';
           } else {
             ctx.fillStyle = VISITED_PROVINCE_COLORS[pi % VISITED_PROVINCE_COLORS.length];
@@ -160,58 +161,65 @@ function draw() {
     }
   }
 
-  // ========== PASS 2: Stroke all province borders (single pass = clean lines) ==========
-  ctx.beginPath();
-  var borderVisitedPath = new Path2D();
-  var borderNormalPath = new Path2D();
-
-  for (var pi = 0; pi < PROVINCES.length; pi++) {
-    var prov = PROVINCES[pi];
-    if (!isPolygonInView(prov, cw, ch)) continue;
-
-    var vc = getProvinceVisitCount(prov.n);
-    var hasVisited = vc.visited > 0;
-    var isHov = hoveredProvince === prov.n;
-
-    // Hovered provinces get drawn separately for highlight
-    if (isHov) continue;
-
-    var targetPath = (zoomLevel < 2 && hasVisited) ? borderVisitedPath : borderNormalPath;
-    for (var gi = 0; gi < prov.p.length; gi++) {
-      var polygon = prov.p[gi];
-      for (var ri = 0; ri < polygon.length; ri++) {
-        var ring = polygon[ri];
-        for (var i = 0; i < ring.length; i++) {
-          var xy = lngLatToXY(ring[i][0], ring[i][1]);
-          var sxy = mapToScreen(xy[0], xy[1]);
-          if (i === 0) targetPath.moveTo(sxy[0], sxy[1]);
-          else targetPath.lineTo(sxy[0], sxy[1]);
+  // ========== PASS 2: Draw borders by iterating arcs once ==========
+  // Collect arcs used by visited provinces for different styling
+  var visitedArcSet = {};
+  if (zoomLevel < 2) {
+    for (var pi = 0; pi < TOPO_DATA.provinces.length; pi++) {
+      var tp = TOPO_DATA.provinces[pi];
+      if (!tp.n) continue;
+      var nm = normalizeProvName(tp.n);
+      var vc = getProvinceVisitCount(nm);
+      if (vc.visited > 0) {
+        // Mark all arcs used by this province
+        var a = tp.a;
+        var flat = JSON.stringify(a);
+        // Extract all arc indices from nested arrays
+        var matches = flat.match(/-?\d+/g);
+        if (matches) {
+          for (var mi = 0; mi < matches.length; mi++) {
+            var idx = parseInt(matches[mi]);
+            var absIdx = idx >= 0 ? idx : ~idx;
+            visitedArcSet[absIdx] = true;
+          }
         }
-        targetPath.closePath();
       }
     }
   }
 
-  // Draw normal borders
+  // Draw all arcs once — shared borders drawn exactly once
+  var normalPath = new Path2D();
+  var visitedPath = new Path2D();
+
+  for (var ai = 0; ai < TOPO_DATA.arcs.length; ai++) {
+    var arc = TOPO_DATA.arcs[ai];
+    var target = (zoomLevel < 2 && visitedArcSet[ai]) ? visitedPath : normalPath;
+    for (var i = 0; i < arc.length; i++) {
+      var xy = lngLatToXY(arc[i][0], arc[i][1]);
+      var sxy = mapToScreen(xy[0], xy[1]);
+      if (i === 0) target.moveTo(sxy[0], sxy[1]);
+      else target.lineTo(sxy[0], sxy[1]);
+    }
+  }
+
   ctx.strokeStyle = 'rgba(80,90,120,0.45)';
   ctx.lineWidth = 0.8;
-  ctx.stroke(borderNormalPath);
+  ctx.stroke(normalPath);
 
-  // Draw visited borders (zoomed out = province mode look)
   if (zoomLevel < 2) {
     ctx.strokeStyle = 'rgba(240,160,96,0.6)';
     ctx.lineWidth = 1.2;
-    ctx.stroke(borderVisitedPath);
+    ctx.stroke(visitedPath);
   } else {
     ctx.strokeStyle = 'rgba(80,90,120,0.45)';
     ctx.lineWidth = 0.8;
-    ctx.stroke(borderVisitedPath);
+    ctx.stroke(visitedPath);
   }
 
-  // Draw hovered province border on top
+  // Hovered province border on top
   if (hoveredProvince) {
-    for (var pi = 0; pi < PROVINCES.length; pi++) {
-      var prov = PROVINCES[pi];
+    for (var pi = 0; pi < provinces.length; pi++) {
+      var prov = provinces[pi];
       if (prov.n !== hoveredProvince) continue;
       ctx.beginPath();
       for (var gi = 0; gi < prov.p.length; gi++) {
@@ -237,8 +245,7 @@ function draw() {
       if (sxy[0] < -100 || sxy[0] > cw + 100 || sxy[1] < -100 || sxy[1] > ch + 100) continue;
 
       var isV = !!visited[city.n];
-      // Draw a small dashed circle around each city representing approximate coverage
-      var coverageR = viewScale * 0.012; // roughly proportional
+      var coverageR = viewScale * 0.012;
       ctx.beginPath();
       ctx.arc(sxy[0], sxy[1], coverageR, 0, Math.PI * 2);
       ctx.setLineDash([4, 4]);
@@ -262,7 +269,6 @@ function draw() {
       var isVisited = !!visited[city.n];
       var isHov = hoveredCity === city.n;
 
-      // Decide visibility
       if (!showAllDots && !isVisited && !isHov) continue;
 
       var xy = lngLatToXY(city.lng, city.lat);
@@ -272,7 +278,6 @@ function draw() {
 
       if (isVisited) {
         needsPulse = true;
-        // Pulse glow
         var glowR = (6 + pulseSize * 8) * dotScale;
         var gradient = ctx.createRadialGradient(sx, sy, 0, sx, sy, glowR);
         gradient.addColorStop(0, 'rgba(240,140,80,' + (0.3 + pulseSize * 0.15) + ')');
@@ -310,17 +315,16 @@ function draw() {
 
   // Province labels
   var showAllProvLabels = zoomLevel >= 1.5;
-  var provLabelFade = zoomLevel > 3; // fade at high zoom
+  var provLabelFade = zoomLevel > 3;
 
-  for (var pi = 0; pi < PROVINCES.length; pi++) {
-    var prov = PROVINCES[pi];
+  for (var pi = 0; pi < provinces.length; pi++) {
+    var prov = provinces[pi];
     if (!prov.c) continue;
     if (!isPolygonInView(prov, cw, ch)) continue;
 
     var vc = getProvinceVisitCount(prov.n);
     var hasVisited = vc.visited > 0;
 
-    // Decide if label should show
     var isLarge = LARGE_PROVINCES.indexOf(prov.n) >= 0;
     if (!showAllProvLabels && !isLarge) continue;
 
@@ -336,18 +340,16 @@ function draw() {
     } else {
       fontSize = Math.max(7, Math.min(14, viewScale * 0.025));
       alpha = provLabelFade ? Math.max(0.2, 1 - (zoomLevel - 3) * 0.3) : 1;
-      if (zoomLevel > 6) continue; // hide province labels at very high zoom
+      if (zoomLevel > 6) continue;
     }
 
-    // Measure and check collision
     ctx.font = (hasVisited ? 'bold ' : '') + fontSize + 'px "PingFang SC","Microsoft YaHei",sans-serif';
     var tw = ctx.measureText(prov.n).width;
     var th = fontSize * 1.3;
 
-    // Priority: visited > large > others
     var priority = (hasVisited ? 2 : 0) + (isLarge ? 1 : 0);
     if (priority < 2 && !labelFits(usedRects, csxy[0], csxy[1], tw + 6, th + 4)) continue;
-    if (priority >= 2) labelFits(usedRects, csxy[0], csxy[1], tw + 6, th + 4); // always show but register
+    if (priority >= 2) labelFits(usedRects, csxy[0], csxy[1], tw + 6, th + 4);
 
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -361,12 +363,10 @@ function draw() {
     }
     ctx.fillText(prov.n, csxy[0], csxy[1]);
 
-    // Visit count when zoomed out (province mode)
     if (zoomLevel < 2 && hasVisited) {
       ctx.font = (fontSize - 2) + 'px sans-serif';
       ctx.fillStyle = 'rgba(240,160,96,' + (0.9 * alpha) + ')';
       ctx.fillText(vc.visited + '/' + vc.total, csxy[0], csxy[1] + fontSize + 2);
-      // Register the count label too
       labelFits(usedRects, csxy[0], csxy[1] + fontSize + 2, ctx.measureText(vc.visited + '/' + vc.total).width + 4, fontSize);
     }
   }
@@ -376,7 +376,6 @@ function draw() {
   var showAllCityNames = zoomLevel > 6;
 
   if (showVisitedCityNames) {
-    // Sort: visited cities first for label priority
     var sortedCities = [];
     for (var ci = 0; ci < CITIES.length; ci++) sortedCities.push(ci);
     sortedCities.sort(function(a, b) {
@@ -413,7 +412,6 @@ function draw() {
     }
   }
 
-  // Request next pulse frame if needed
   if (needsPulse) {
     if (!draw._rafId) {
       draw._rafId = requestAnimationFrame(function() {
@@ -424,7 +422,6 @@ function draw() {
   }
 }
 
-// Cancel pulse animation when not needed
 draw._rafId = null;
 
 // ====== Hit Testing ======
@@ -444,21 +441,26 @@ function findNearestCity(mx, my) {
   return closest;
 }
 
+function pointInRing(pts, mx, my) {
+  var inside = false;
+  for (var i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    var xi = pts[i][0], yi = pts[i][1];
+    var xj = pts[j][0], yj = pts[j][1];
+    if (((yi > my) !== (yj > my)) && mx < (xj - xi) * (my - yi) / (yj - yi) + xi) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
 function isInsideChina(mx, my) {
-  for (var pi = 0; pi < PROVINCES.length; pi++) {
-    var prov = PROVINCES[pi];
+  var provinces = getDecodedProvinces();
+  for (var pi = 0; pi < provinces.length; pi++) {
+    var prov = provinces[pi];
     for (var gi = 0; gi < prov.p.length; gi++) {
       var ring = prov.p[gi][0];
-      var inside = false;
       var pts = ring.map(function(c) { return lngLatToXY(c[0], c[1]); });
-      for (var i = 0, j = pts.length - 1; i < pts.length; j = i++) {
-        var xi = pts[i][0], yi = pts[i][1];
-        var xj = pts[j][0], yj = pts[j][1];
-        if (((yi > my) !== (yj > my)) && mx < (xj - xi) * (my - yi) / (yj - yi) + xi) {
-          inside = !inside;
-        }
-      }
-      if (inside) return true;
+      if (pointInRing(pts, mx, my)) return true;
     }
   }
   return false;
@@ -470,20 +472,13 @@ function findCityAt(mx, my) {
 }
 
 function findProvinceAt(mx, my) {
-  for (var pi = 0; pi < PROVINCES.length; pi++) {
-    var prov = PROVINCES[pi];
+  var provinces = getDecodedProvinces();
+  for (var pi = 0; pi < provinces.length; pi++) {
+    var prov = provinces[pi];
     for (var gi = 0; gi < prov.p.length; gi++) {
       var ring = prov.p[gi][0];
-      var inside = false;
       var pts = ring.map(function(c) { return lngLatToXY(c[0], c[1]); });
-      for (var i = 0, j = pts.length - 1; i < pts.length; j = i++) {
-        var xi = pts[i][0], yi = pts[i][1];
-        var xj = pts[j][0], yj = pts[j][1];
-        if (((yi > my) !== (yj > my)) && mx < (xj - xi) * (my - yi) / (yj - yi) + xi) {
-          inside = !inside;
-        }
-      }
-      if (inside) return prov;
+      if (pointInRing(pts, mx, my)) return prov;
     }
   }
   return null;
