@@ -145,8 +145,9 @@ function draw() {
         if (isHov) {
           ctx.fillStyle = hasVisited ? 'rgba(240,140,80,0.45)' : 'rgba(80,90,120,0.55)';
         } else if (hasVisited) {
-          if (mode === 'province') {
-            var intensity = vc.visited / vc.total;
+          var intensity = vc.visited / vc.total;
+          if (zoomLevel < 2) {
+            // 省份模式：更明显的打卡高亮
             ctx.fillStyle = 'rgba(224,112,80,' + (0.15 + intensity * 0.55) + ')';
           } else {
             ctx.fillStyle = VISITED_PROVINCE_COLORS[pi % VISITED_PROVINCE_COLORS.length];
@@ -175,7 +176,7 @@ function draw() {
     // Hovered provinces get drawn separately for highlight
     if (isHov) continue;
 
-    var targetPath = (mode === 'province' && hasVisited) ? borderVisitedPath : borderNormalPath;
+    var targetPath = (zoomLevel < 2 && hasVisited) ? borderVisitedPath : borderNormalPath;
     for (var gi = 0; gi < prov.p.length; gi++) {
       var polygon = prov.p[gi];
       for (var ri = 0; ri < polygon.length; ri++) {
@@ -196,8 +197,8 @@ function draw() {
   ctx.lineWidth = 0.8;
   ctx.stroke(borderNormalPath);
 
-  // Draw visited borders (province mode)
-  if (mode === 'province') {
+  // Draw visited borders (zoomed out = province mode look)
+  if (zoomLevel < 2) {
     ctx.strokeStyle = 'rgba(240,160,96,0.6)';
     ctx.lineWidth = 1.2;
     ctx.stroke(borderVisitedPath);
@@ -329,7 +330,7 @@ function draw() {
 
     var fontSize;
     var alpha;
-    if (mode === 'province') {
+    if (zoomLevel < 2) {
       fontSize = Math.max(8, Math.min(16, viewScale * 0.03));
       alpha = 1;
     } else {
@@ -352,7 +353,7 @@ function draw() {
     ctx.textBaseline = 'middle';
 
     if (hasVisited) {
-      ctx.fillStyle = mode === 'province'
+      ctx.fillStyle = zoomLevel < 2
         ? 'rgba(255,255,255,' + alpha + ')'
         : 'rgba(240,180,120,' + (0.8 * alpha) + ')';
     } else {
@@ -360,8 +361,8 @@ function draw() {
     }
     ctx.fillText(prov.n, csxy[0], csxy[1]);
 
-    // Visit count in province mode
-    if (mode === 'province' && hasVisited) {
+    // Visit count when zoomed out (province mode)
+    if (zoomLevel < 2 && hasVisited) {
       ctx.font = (fontSize - 2) + 'px sans-serif';
       ctx.fillStyle = 'rgba(240,160,96,' + (0.9 * alpha) + ')';
       ctx.fillText(vc.visited + '/' + vc.total, csxy[0], csxy[1] + fontSize + 2);
@@ -486,4 +487,20 @@ function findProvinceAt(mx, my) {
     }
   }
   return null;
+}
+
+// Find nearest city within a specific province
+function findNearestCityInProv(mx, my, provName) {
+  var closest = null, closestDist = Infinity;
+  for (var i = 0; i < CITIES.length; i++) {
+    if (CITIES[i].p !== provName) continue;
+    var xy = lngLatToXY(CITIES[i].lng, CITIES[i].lat);
+    var dx = xy[0] - mx, dy = xy[1] - my;
+    var dist = dx * dx + dy * dy;
+    if (dist < closestDist) {
+      closest = CITIES[i];
+      closestDist = dist;
+    }
+  }
+  return closest;
 }

@@ -36,14 +36,12 @@ function setupEvents() {
     // PC hover效果
     if (e.pointerType === 'mouse') {
       var mxy = screenToMap(e.clientX, e.clientY);
-      if (mode === 'city') {
+      var zoomLevel = baseScale > 0 ? viewScale / baseScale : 1;
+
+      if (zoomLevel >= 2) {
         var city = findCityAt(mxy[0], mxy[1]);
         var newHovered = city ? city.n : null;
-        var newHoveredP = null;
-        if (city) {
-          // Also highlight the province
-          newHoveredP = city.p;
-        }
+        var newHoveredP = city ? city.p : null;
         if (newHovered !== hoveredCity || newHoveredP !== hoveredProvince) {
           hoveredCity = newHovered;
           hoveredProvince = newHoveredP;
@@ -55,6 +53,7 @@ function setupEvents() {
         var newHoveredP = prov ? prov.n : null;
         if (newHoveredP !== hoveredProvince) {
           hoveredProvince = newHoveredP;
+          hoveredCity = null;
           canvas.style.cursor = prov ? 'pointer' : 'grab';
           draw();
         }
@@ -98,12 +97,20 @@ function setupEvents() {
     var cx = e.clientX, cy = e.clientY;
     singleTapTimer = setTimeout(function() {
       var mxy = screenToMap(cx, cy);
-      if (mode === 'city') {
+      var zoomLevel = baseScale > 0 ? viewScale / baseScale : 1;
+
+      if (zoomLevel >= 2) {
+        // 放大状态 → 城市模式
         var city = findCityAt(mxy[0], mxy[1]);
         if (city) handleCityClick(city);
       } else {
+        // 缩小状态 → 省份点击，但预选最近城市
         var prov = findProvinceAt(mxy[0], mxy[1]);
-        if (prov) showProvDetail(prov.n);
+        if (prov) {
+          // 找到点击位置最近的城市作为预选
+          var nearestCity = findNearestCityInProv(mxy[0], mxy[1], prov.n);
+          showProvDetail(prov.n, nearestCity);
+        }
       }
     }, 300);
   });
@@ -246,7 +253,7 @@ function selectSearchCity(name) {
   viewX = W / 2 - xy[0] * viewScale;
   viewY = H / 2 - xy[1] * viewScale;
   hoveredCity = city.n;
-  if (mode !== 'city') setMode('city');
+  updateZoomLevel();
   draw();
   // 延迟弹出详情
   setTimeout(function() { handleCityClick(city); }, 300);

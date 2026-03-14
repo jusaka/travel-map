@@ -61,6 +61,7 @@ canvas{display:block;width:100%;height:100%}
 .province-detail .city-item{padding:8px;border-radius:8px;border:1px solid var(--border);margin-bottom:6px;cursor:pointer;transition:all .2s;font-size:13px}
 .province-detail .city-item:hover{border-color:var(--accent)}
 .province-detail .city-item.visited{border-color:var(--accent);background:rgba(224,112,80,0.1)}
+.province-detail .city-item.nearest{border-color:var(--accent2);background:rgba(240,160,96,0.12);font-weight:600}
 .province-detail .city-item .note-preview{color:var(--dim);font-size:11px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* Import/Export panel */
 .io-panel{position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:300;display:none;align-items:center;justify-content:center;padding:20px}
@@ -110,9 +111,6 @@ canvas{display:block;width:100%;height:100%}
 <div class="toolbar">
   <span class="emoji">🗺️</span>
   <button class="profile-btn" onclick="showProfileModal()" title="切换用户"><span class="avatar">👤</span><span id="profileBtnName">默认用户</span></button>
-  <div class="mode-toggle">
-    <button id="cityModeBtn" class="active" onclick="setMode('city')">城市</button>
-    <button id="provModeBtn" onclick="setMode('province')">省份</button>
   </div>
   <div class="search-box">
     <input id="searchInput" type="text" placeholder="搜索城市..." oninput="onSearch(this.value)" onfocus="onSearch(this.value)">

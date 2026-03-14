@@ -68,17 +68,30 @@ function setMode(m) {
 }
 
 // Province detail
-function showProvDetail(provName) {
+function showProvDetail(provName, nearestCity) {
   var panel = document.getElementById('provDetail');
   document.getElementById('provDetailName').textContent = provName;
   var cities = CITIES.filter(function(c) { return c.p === provName; });
   var vc = cities.filter(function(c) { return visited[c.n]; }).length;
   document.getElementById('provDetailInfo').textContent = '已打卡 ' + vc + '/' + cities.length + ' 座城市';
   var list = document.getElementById('provDetailCities');
-  list.innerHTML = cities.map(function(c) {
+
+  // Sort: nearest city first (pre-selected), then visited, then rest
+  var sorted = cities.slice().sort(function(a, b) {
+    if (nearestCity) {
+      if (a.n === nearestCity.n) return -1;
+      if (b.n === nearestCity.n) return 1;
+    }
+    var va = visited[a.n] ? 1 : 0;
+    var vb = visited[b.n] ? 1 : 0;
+    return vb - va;
+  });
+
+  list.innerHTML = sorted.map(function(c) {
     var v = visited[c.n];
-    return '<div class="city-item ' + (v ? 'visited' : '') + '" onclick="provCityClick(\'' + c.n + '\')">' +
-      (v ? '🔴' : '⚪') + ' ' + c.n +
+    var isNearest = nearestCity && c.n === nearestCity.n;
+    return '<div class="city-item ' + (v ? 'visited' : '') + (isNearest ? ' nearest' : '') + '" onclick="provCityClick(\'' + c.n + '\')">' +
+      (v ? '🔴' : (isNearest ? '👉' : '⚪')) + ' ' + c.n +
       (v && v.note ? '<div class="note-preview">📝 ' + v.note + '</div>' : '') +
     '</div>';
   }).join('');
@@ -139,21 +152,27 @@ function showIOPanel() {
 function closeIOPanel() { document.getElementById('ioPanel').classList.remove('show'); }
 
 // ====== 紧凑编码 ======
-// 362个城市 → bitmap (46 bytes) → Base64 (62 chars)
-// 格式: "TM1:" + base64(bitmap) + 备注部分(可选)
-// 备注格式: "|" + 索引:备注 用 ";" 分隔
+// 格式: "TM1:" + base64(header + bitmap) + 备注(可选)
+// header: 2 bytes = city count (little-endian), 用于向前兼容
+// 362城市 → 2+46=48 bytes → base64 ≈ 64 chars
+// 解码时：如果保存的cityCount < 当前CITIES数组，多余的城市视为未打卡
+//         如果保存的cityCount > 当前CITIES数组，截断处理
 
 function encodeBitmap() {
-  var bits = new Uint8Array(Math.ceil(CITIES.length / 8));
-  for (var i = 0; i < CITIES.length; i++) {
+  var cityCount = CITIES.length;
+  var bitmapLen = Math.ceil(cityCount / 8);
+  var buf = new Uint8Array(2 + bitmapLen);
+  // Header: city count (little-endian 16-bit)
+  buf[0] = cityCount & 0xFF;
+  buf[1] = (cityCount >> 8) & 0xFF;
+  for (var i = 0; i < cityCount; i++) {
     if (visited[CITIES[i].n]) {
-      bits[i >> 3] |= (1 << (i & 7));
+      buf[2 + (i >> 3)] |= (1 << (i & 7));
     }
   }
-  // Convert to base64
   var binary = '';
-  for (var i = 0; i < bits.length; i++) {
-    binary += String.fromCharCode(bits[i]);
+  for (var i = 0; i < buf.length; i++) {
+    binary += String.fromCharCode(buf[i]);
   }
   return btoa(binary);
 }
@@ -161,8 +180,13 @@ function encodeBitmap() {
 function decodeBitmap(b64) {
   var binary = atob(b64);
   var result = {};
-  for (var i = 0; i < CITIES.length; i++) {
-    var byte = binary.charCodeAt(i >> 3);
+  if (binary.length < 2) return result;
+  var savedCount = binary.charCodeAt(0) | (binary.charCodeAt(1) << 8);
+  var decodeCount = Math.min(savedCount, CITIES.length);
+  for (var i = 0; i < decodeCount; i++) {
+    var byteIdx = 2 + (i >> 3);
+    if (byteIdx >= binary.length) break;
+    var byte = binary.charCodeAt(byteIdx);
     if (byte & (1 << (i & 7))) {
       result[CITIES[i].n] = { note: '', time: Date.now() };
     }
