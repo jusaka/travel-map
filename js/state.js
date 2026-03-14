@@ -8,7 +8,7 @@ let lastPinchDist = 0;
 var baseScale = 1; // 初始适配屏幕的scale值
 let hoveredCity = null, hoveredProvince = null;
 let selectedCity = null;
-let statsCollapsed = false;
+let statsCollapsed = true;
 let activeProfile = '默认用户';
 let profiles = {}; // { profileName: { visitedCities: {}, notes: {} } }
 let pendingImportData = null;

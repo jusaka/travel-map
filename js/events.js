@@ -209,7 +209,16 @@ function zoomAt(cx, cy, factor) {
   viewX = cx - (cx - viewX) * ratio;
   viewY = cy - (cy - viewY) * ratio;
   viewScale = newScale;
+  updateZoomLevel();
   draw();
+}
+
+function updateZoomLevel() {
+  var el = document.getElementById('zoomLevel');
+  if (el && baseScale > 0) {
+    var level = viewScale / baseScale;
+    el.textContent = level < 1 ? level.toFixed(1) + 'x' : Math.round(level) + 'x';
+  }
 }
 
 // ====== 搜索 ======
