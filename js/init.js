@@ -49,9 +49,6 @@ function setupModalEvents() {
   document.getElementById('cityModal').addEventListener('click', function(e) {
     if (e.target === e.currentTarget) closeCityModal();
   });
-  document.getElementById('ioPanel').addEventListener('click', function(e) {
-    if (e.target === e.currentTarget) closeIOPanel();
-  });
   document.getElementById('profileModal').addEventListener('click', function(e) {
     if (e.target === e.currentTarget) closeProfileModal();
   });

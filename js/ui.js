@@ -141,15 +141,7 @@ function toggleStats() {
 }
 
 // Import/Export
-function showIOPanel() {
-  document.getElementById('ioPanel').classList.add('show');
-  document.getElementById('ioText').value = '';
-  document.getElementById('ioTextWrap').style.display = 'none';
-}
-function closeIOPanel() {
-  document.getElementById('ioPanel').classList.remove('show');
-  document.getElementById('ioTextWrap').style.display = 'none';
-}
+// IO panel removed — export/import/share are direct toolbar actions now
 
 // ====== 紧凑编码 v2 ======
 // 格式: "TM2:" + base64(gzip(JSON))
@@ -248,56 +240,38 @@ function decodeTM1(body) {
   return result;
 }
 
-async function exportCompact() {
+async function exportToClipboard() {
   var jsonStr = encodeVisited();
   var b64 = await compressData(jsonStr);
   var code = 'TM2:' + b64;
-  // Show textarea with the code
-  var wrap = document.getElementById('ioTextWrap');
-  var textarea = document.getElementById('ioText');
-  wrap.style.display = 'block';
-  textarea.value = code;
-  textarea.select();
-  if (navigator.clipboard) {
-    navigator.clipboard.writeText(code).then(function() {
-      showToast('📋 已复制到剪贴板！(' + code.length + '字符)');
-    }).catch(function() {
-      showToast('📋 已生成，请手动复制');
-    });
-  } else {
+  try {
+    await navigator.clipboard.writeText(code);
+    showToast('📋 已导出到剪贴板（' + code.length + '字符）');
+  } catch(e) {
+    // Fallback: temp textarea
+    var ta = document.createElement('textarea');
+    ta.value = code;
+    document.body.appendChild(ta);
+    ta.select();
     document.execCommand('copy');
-    showToast('📋 已复制到剪贴板！');
+    document.body.removeChild(ta);
+    showToast('📋 已导出到剪贴板');
   }
 }
 
-function importCompact() {
-  var wrap = document.getElementById('ioTextWrap');
-  var textarea = document.getElementById('ioText');
-  wrap.style.display = 'block';
-  textarea.placeholder = '粘贴分享码后点此处，再点导入按钮';
-  var text = textarea.value.trim();
-  if (!text) {
-    // Try clipboard first
-    if (navigator.clipboard && navigator.clipboard.readText) {
-      navigator.clipboard.readText().then(function(t) {
-        if (t && (t.startsWith('TM2:') || t.startsWith('TM1:'))) {
-          textarea.value = t;
-          doImportCompact(t);
-        } else {
-          textarea.focus();
-          showToast('请粘贴分享码');
-        }
-      }).catch(function() {
-        textarea.focus();
-        showToast('请粘贴分享码');
-      });
+async function importFromClipboard() {
+  try {
+    var text = await navigator.clipboard.readText();
+    text = (text || '').trim();
+    if (!text) { showToast('❌ 剪贴板为空'); return; }
+    if (!text.startsWith('TM2:') && !text.startsWith('TM1:')) {
+      showToast('❌ 剪贴板中没有有效的分享码');
       return;
     }
-    textarea.focus();
-    showToast('请粘贴分享码');
-    return;
+    await doImportCompact(text);
+  } catch(e) {
+    showToast('❌ 无法读取剪贴板，请检查权限');
   }
-  doImportCompact(text);
 }
 
 async function doImportCompact(text) {
@@ -316,7 +290,6 @@ async function doImportCompact(text) {
     pendingImportData = { visited: imported, profileName: '' };
     document.getElementById('importOverwriteName').textContent = activeProfile;
     document.getElementById('importChoiceModal').classList.add('show');
-    closeIOPanel();
   } catch(e) {
     showToast('❌ 分享码解析失败');
   }
@@ -349,7 +322,6 @@ function importData(event) {
       pendingImportData = { visited: importVisited, profileName: data.profileName || '' };
       document.getElementById('importOverwriteName').textContent = activeProfile;
       document.getElementById('importChoiceModal').classList.add('show');
-      closeIOPanel();
     } catch(err) {
       showToast('❌ 文件格式错误');
     }
@@ -392,7 +364,6 @@ function doImportOverwrite() {
 
 // Share card
 function shareMapImage() {
-  closeIOPanel();
   showToast('📤 生成中...');
 
   setTimeout(function() {
