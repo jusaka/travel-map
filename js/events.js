@@ -62,6 +62,11 @@ function setupEvents() {
     }
   });
 
+  // 双击检测
+  var lastTapTime = 0;
+  var lastTapX = 0, lastTapY = 0;
+  var singleTapTimer = null;
+
   canvas.addEventListener('pointerup', function(e) {
     var dx = Math.abs(e.clientX - dragStartX);
     var dy = Math.abs(e.clientY - dragStartY);
@@ -69,19 +74,38 @@ function setupEvents() {
     var wasDrag = dx > DRAG_THRESHOLD || dy > DRAG_THRESHOLD || dt > 500;
     isDragging = false;
 
-    // 如果是拖拽或长按，不算点击
     if (wasDrag) return;
-    // 双指缩放期间不触发点击
     if (activeTouchCount > 1) return;
 
-    var mxy = screenToMap(e.clientX, e.clientY);
-    if (mode === 'city') {
-      var city = findCityAt(mxy[0], mxy[1]);
-      if (city) handleCityClick(city);
-    } else {
-      var prov = findProvinceAt(mxy[0], mxy[1]);
-      if (prov) showProvDetail(prov.n);
+    var now = Date.now();
+    var tapDx = Math.abs(e.clientX - lastTapX);
+    var tapDy = Math.abs(e.clientY - lastTapY);
+
+    // 双击判定：300ms内、位置接近
+    if (now - lastTapTime < 300 && tapDx < 30 && tapDy < 30) {
+      // 双击放大
+      clearTimeout(singleTapTimer);
+      lastTapTime = 0;
+      zoomAt(e.clientX, e.clientY, 2);
+      return;
     }
+
+    lastTapTime = now;
+    lastTapX = e.clientX;
+    lastTapY = e.clientY;
+
+    // 延迟单击，等双击判定
+    var cx = e.clientX, cy = e.clientY;
+    singleTapTimer = setTimeout(function() {
+      var mxy = screenToMap(cx, cy);
+      if (mode === 'city') {
+        var city = findCityAt(mxy[0], mxy[1]);
+        if (city) handleCityClick(city);
+      } else {
+        var prov = findProvinceAt(mxy[0], mxy[1]);
+        if (prov) showProvDetail(prov.n);
+      }
+    }, 300);
   });
 
   canvas.addEventListener('pointercancel', function() {
