@@ -68,6 +68,12 @@ canvas{display:block;width:100%;height:100%}
 /* Toast */
 .toast{position:fixed;top:60px;left:50%;transform:translateX(-50%);background:var(--accent);color:#fff;padding:8px 20px;border-radius:20px;font-size:13px;z-index:400;opacity:0;transition:opacity .3s;pointer-events:none}
 .toast.show{opacity:1}
+.copy-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:350;display:none;align-items:flex-end;justify-content:center;padding:20px}
+.copy-overlay.show{display:flex}
+.copy-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px;width:100%;max-width:380px;margin-bottom:env(safe-area-inset-bottom,20px)}
+.copy-card textarea{width:100%;background:var(--bg);color:var(--accent);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:11px;font-family:monospace;resize:none;-webkit-user-select:all;user-select:all}
+.copy-card .btn-primary{background:var(--accent);color:#fff;border:none;border-radius:10px;cursor:pointer;font-weight:600}
+.copy-card .btn-secondary{background:var(--bg);color:var(--dim);border:1px solid var(--border);border-radius:10px;cursor:pointer}
 /* Profile */
 .profile-btn{display:flex;align-items:center;gap:4px;padding:4px 10px;border-radius:16px;border:1px solid var(--border);background:var(--card);color:var(--text);cursor:pointer;font-size:12px;white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis;flex-shrink:0;transition:all .2s}
 .profile-btn:hover{border-color:var(--accent);color:var(--accent)}
@@ -173,6 +179,17 @@ canvas{display:block;width:100%;height:100%}
 </div>
 
 <div class="toast" id="toast"></div>
+
+<div class="copy-overlay" id="copyOverlay" onclick="if(event.target===this)closeCopyOverlay()">
+  <div class="copy-card">
+    <div style="font-size:13px;color:var(--dim);margin-bottom:8px">分享码 · <span id="copyLen"></span></div>
+    <textarea id="copyText" readonly rows="3"></textarea>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button class="btn-primary" onclick="doCopyAndClose()" style="flex:1;padding:12px;font-size:15px">📋 复制</button>
+      <button class="btn-secondary" onclick="closeCopyOverlay()" style="padding:12px">✕</button>
+    </div>
+  </div>
+</div>
 
 <div class="modal-overlay" id="profileModal">
   <div class="modal profile-modal">

@@ -249,19 +249,35 @@ async function exportToClipboard() {
   var jsonStr = encodeVisited();
   var b64 = await compressData(jsonStr);
   var code = 'TM2:' + b64;
+  
+  // Show copy overlay
+  var overlay = document.getElementById('copyOverlay');
+  var ta = document.getElementById('copyText');
+  var lenEl = document.getElementById('copyLen');
+  ta.value = code;
+  lenEl.textContent = code.length + '字符';
+  overlay.classList.add('show');
+  // Auto select
+  setTimeout(function() { ta.focus(); ta.select(); }, 50);
+}
+
+function doCopyAndClose() {
+  var ta = document.getElementById('copyText');
+  ta.select();
+  var ok = false;
   try {
-    await navigator.clipboard.writeText(code);
-    showToast('📋 已导出到剪贴板（' + code.length + '字符）');
-  } catch(e) {
-    // Fallback: temp textarea
-    var ta = document.createElement('textarea');
-    ta.value = code;
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand('copy');
-    document.body.removeChild(ta);
-    showToast('📋 已导出到剪贴板');
+    ok = document.execCommand('copy');
+  } catch(e) {}
+  if (!ok && navigator.clipboard) {
+    navigator.clipboard.writeText(ta.value).catch(function(){});
+    ok = true;
   }
+  document.getElementById('copyOverlay').classList.remove('show');
+  showToast(ok ? '📋 已复制！' : '请手动长按选择复制');
+}
+
+function closeCopyOverlay() {
+  document.getElementById('copyOverlay').classList.remove('show');
 }
 
 async function importFromClipboard() {
