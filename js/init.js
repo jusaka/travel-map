@@ -3,7 +3,10 @@ function initCanvas() {
   canvas = document.getElementById('mapCanvas');
   ctx = canvas.getContext('2d');
   resize();
-  window.addEventListener('resize', resize);
+  window.addEventListener('resize', function() {
+    resize();
+    resetView();
+  });
 }
 
 function resize() {
@@ -15,7 +18,6 @@ function resize() {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   W = window.innerWidth;
   H = window.innerHeight;
-  draw();
 }
 
 function resetView() {
@@ -32,6 +34,9 @@ function resetView() {
   } else {
     viewScale = availH * mapAspect;
   }
+
+  // 记录基础缩放值，用于限制zoom范围
+  baseScale = viewScale;
 
   var mapW = viewScale;
   var mapH = viewScale / mapAspect;

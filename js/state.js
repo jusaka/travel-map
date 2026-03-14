@@ -5,6 +5,7 @@ let viewX = 0, viewY = 0, viewScale = 1;
 let canvas, ctx, W, H;
 let isDragging = false, dragStartX, dragStartY, dragViewX, dragViewY;
 let lastPinchDist = 0;
+var baseScale = 1; // 初始适配屏幕的scale值
 let hoveredCity = null, hoveredProvince = null;
 let selectedCity = null;
 let statsCollapsed = false;

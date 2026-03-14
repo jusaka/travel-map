@@ -149,8 +149,9 @@ canvas{display:block;width:100%;height:100%}
     <textarea id="modalNote" placeholder="写点什么...你在这座城市的回忆"></textarea>
     <div class="modal-btns">
       <button class="btn-secondary" onclick="closeCityModal()">取消</button>
-      <button class="btn-danger" id="modalUnvisit" onclick="unvisitCity()">取消打卡</button>
-      <button class="btn-primary" onclick="saveCityNote()">保存</button>
+      <button class="btn-primary" id="modalVisitBtn" onclick="visitCity()" style="display:none">✅ 打卡</button>
+      <button class="btn-danger" id="modalUnvisit" onclick="unvisitCity()" style="display:none">取消打卡</button>
+      <button class="btn-primary" id="modalSaveBtn" onclick="saveCityNote()" style="display:none">保存</button>
     </div>
   </div>
 </div>

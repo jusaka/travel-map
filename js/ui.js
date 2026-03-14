@@ -1,29 +1,41 @@
 // ====== UI操作 ======
 
-// City actions
+// City actions — 点击城市统一弹窗，不直接打卡
 function handleCityClick(city) {
-  if (visited[city.n]) {
-    openCityModal(city);
-  } else {
-    visited[city.n] = { note: '', time: Date.now() };
-    saveData();
-    updateStats();
-    showToast('✅ ' + city.n + ' 已打卡！');
-    draw();
-  }
+  openCityModal(city);
 }
 
 function openCityModal(city) {
   selectedCity = city;
+  var isVisited = !!visited[city.n];
   document.getElementById('modalCityName').textContent = city.n;
   document.getElementById('modalCityInfo').textContent = city.p + ' · ' + city.lng + '°E ' + city.lat + '°N';
-  document.getElementById('modalNote').value = visited[city.n]?.note || '';
+  document.getElementById('modalNote').value = (visited[city.n] && visited[city.n].note) || '';
+
+  // 根据是否已打卡显示不同按钮
+  document.getElementById('modalVisitBtn').style.display = isVisited ? 'none' : 'block';
+  document.getElementById('modalUnvisit').style.display = isVisited ? 'block' : 'none';
+  document.getElementById('modalSaveBtn').style.display = isVisited ? 'block' : 'none';
+  document.getElementById('modalNote').placeholder = isVisited ? '写点什么...你在这座城市的回忆' : '打卡后可以写备注~';
+  document.getElementById('modalNote').disabled = !isVisited;
+
   document.getElementById('cityModal').classList.add('show');
 }
 
 function closeCityModal() {
   document.getElementById('cityModal').classList.remove('show');
   selectedCity = null;
+}
+
+function visitCity() {
+  if (!selectedCity) return;
+  visited[selectedCity.n] = { note: '', time: Date.now() };
+  saveData();
+  updateStats();
+  showToast('✅ ' + selectedCity.n + ' 已打卡！');
+  // 刷新弹窗状态
+  openCityModal(selectedCity);
+  draw();
 }
 
 function saveCityNote() {
@@ -38,6 +50,7 @@ function saveCityNote() {
 
 function unvisitCity() {
   if (!selectedCity) return;
+  if (!confirm('确定取消「' + selectedCity.n + '」的打卡记录吗？')) return;
   delete visited[selectedCity.n];
   saveData();
   updateStats();
@@ -66,7 +79,7 @@ function showProvDetail(provName) {
     var v = visited[c.n];
     return '<div class="city-item ' + (v ? 'visited' : '') + '" onclick="provCityClick(\'' + c.n + '\')">' +
       (v ? '🔴' : '⚪') + ' ' + c.n +
-      (v?.note ? '<div class="note-preview">📝 ' + v.note + '</div>' : '') +
+      (v && v.note ? '<div class="note-preview">📝 ' + v.note + '</div>' : '') +
     '</div>';
   }).join('');
   panel.classList.add('show');
@@ -79,16 +92,8 @@ function closeProvDetail() {
 function provCityClick(name) {
   var city = CITIES.find(function(c) { return c.n === name; });
   if (!city) return;
-  if (visited[name]) {
-    openCityModal(city);
-  } else {
-    visited[name] = { note: '', time: Date.now() };
-    saveData();
-    updateStats();
-    showToast('✅ ' + name + ' 已打卡！');
-    showProvDetail(city.p);
-    draw();
-  }
+  // 统一弹窗，不直接打卡
+  openCityModal(city);
 }
 
 // Stats
@@ -129,7 +134,7 @@ function closeIOPanel() { document.getElementById('ioPanel').classList.remove('s
 function exportData() {
   var data = { profileName: activeProfile, version: 2, visitedCities: visited, notes: {}, exportTime: new Date().toISOString() };
   for (var k in visited) {
-    if (visited[k]?.note) data.notes[k] = visited[k].note;
+    if (visited[k] && visited[k].note) data.notes[k] = visited[k].note;
   }
   var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   var a = document.createElement('a');
@@ -221,8 +226,7 @@ function generateShareCard() {
     cx.fillText('👤 ' + activeProfile, cardW / 2, 98);
 
     var mapY = 100, mapH = 600;
-    var mapScale = Math.min((cardW - 80) / W, mapH / H);
-    var mapOffX = (cardW - W * mapScale) / 2;
+    var mapScale = Math.min((cardW - 80), mapH);
 
     for (var pi = 0; pi < PROVINCES.length; pi++) {
       var prov = PROVINCES[pi];
@@ -234,8 +238,8 @@ function generateShareCard() {
           cx.beginPath();
           for (var i = 0; i < ring.length; i++) {
             var xy = lngLatToXY(ring[i][0], ring[i][1]);
-            var sx = xy[0] * mapScale + mapOffX;
-            var sy = xy[1] * mapScale + mapY;
+            var sx = xy[0] * mapScale + (cardW - mapScale) / 2;
+            var sy = xy[1] * mapScale * 0.75 + mapY;
             if (i === 0) cx.moveTo(sx, sy);
             else cx.lineTo(sx, sy);
           }
@@ -254,7 +258,7 @@ function generateShareCard() {
       if (!visited[city.n]) continue;
       var xy = lngLatToXY(city.lng, city.lat);
       cx.beginPath();
-      cx.arc(xy[0] * mapScale + mapOffX, xy[1] * mapScale + mapY, 3, 0, Math.PI * 2);
+      cx.arc(xy[0] * mapScale + (cardW - mapScale) / 2, xy[1] * mapScale * 0.75 + mapY, 3, 0, Math.PI * 2);
       cx.fillStyle = '#f0a060';
       cx.fill();
     }
