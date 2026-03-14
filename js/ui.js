@@ -144,8 +144,12 @@ function toggleStats() {
 function showIOPanel() {
   document.getElementById('ioPanel').classList.add('show');
   document.getElementById('ioText').value = '';
+  document.getElementById('ioTextWrap').style.display = 'none';
 }
-function closeIOPanel() { document.getElementById('ioPanel').classList.remove('show'); }
+function closeIOPanel() {
+  document.getElementById('ioPanel').classList.remove('show');
+  document.getElementById('ioTextWrap').style.display = 'none';
+}
 
 // ====== 紧凑编码 v2 ======
 // 格式: "TM2:" + base64(gzip(JSON))
@@ -248,7 +252,10 @@ async function exportCompact() {
   var jsonStr = encodeVisited();
   var b64 = await compressData(jsonStr);
   var code = 'TM2:' + b64;
+  // Show textarea with the code
+  var wrap = document.getElementById('ioTextWrap');
   var textarea = document.getElementById('ioText');
+  wrap.style.display = 'block';
   textarea.value = code;
   textarea.select();
   if (navigator.clipboard) {
@@ -264,22 +271,30 @@ async function exportCompact() {
 }
 
 function importCompact() {
-  var text = document.getElementById('ioText').value.trim();
+  var wrap = document.getElementById('ioTextWrap');
+  var textarea = document.getElementById('ioText');
+  wrap.style.display = 'block';
+  textarea.placeholder = '粘贴分享码后点此处，再点导入按钮';
+  var text = textarea.value.trim();
   if (!text) {
+    // Try clipboard first
     if (navigator.clipboard && navigator.clipboard.readText) {
       navigator.clipboard.readText().then(function(t) {
         if (t && (t.startsWith('TM2:') || t.startsWith('TM1:'))) {
-          document.getElementById('ioText').value = t;
+          textarea.value = t;
           doImportCompact(t);
         } else {
-          showToast('❌ 剪贴板中没有有效的分享码');
+          textarea.focus();
+          showToast('请粘贴分享码');
         }
       }).catch(function() {
-        showToast('请粘贴分享码后点击导入');
+        textarea.focus();
+        showToast('请粘贴分享码');
       });
       return;
     }
-    showToast('请粘贴分享码后点击导入');
+    textarea.focus();
+    showToast('请粘贴分享码');
     return;
   }
   doImportCompact(text);
