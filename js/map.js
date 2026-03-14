@@ -235,24 +235,68 @@ function draw() {
     }
   }
 
-  // ========== PASS 3: City coverage circles (zoom > 4x) ==========
-  if (zoomLevel > 4) {
-    var circleAlpha = Math.min(0.15, (zoomLevel - 4) * 0.05);
-    for (var ci = 0; ci < CITIES.length; ci++) {
-      var city = CITIES[ci];
-      var xy = lngLatToXY(city.lng, city.lat);
-      var sxy = mapToScreen(xy[0], xy[1]);
-      if (sxy[0] < -100 || sxy[0] > cw + 100 || sxy[1] < -100 || sxy[1] > ch + 100) continue;
-
-      var isV = !!visited[city.n];
-      var coverageR = viewScale * 0.012;
-      ctx.beginPath();
-      ctx.arc(sxy[0], sxy[1], coverageR, 0, Math.PI * 2);
-      ctx.setLineDash([4, 4]);
-      ctx.strokeStyle = isV ? 'rgba(240,160,96,' + circleAlpha + ')' : 'rgba(100,110,140,' + circleAlpha + ')';
-      ctx.lineWidth = 0.8;
-      ctx.stroke();
-      ctx.setLineDash([]);
+  // ========== PASS 3: City boundaries (zoom > 3x) ==========
+  if (zoomLevel > 3) {
+    // Trigger loading for visible provinces
+    var visProvs = getVisibleProvinces();
+    for (var vpi = 0; vpi < visProvs.length; vpi++) {
+      loadCityBoundaries(visProvs[vpi]);
+    }
+    
+    var cityBorderAlpha = Math.min(0.5, (zoomLevel - 3) * 0.15);
+    
+    for (var vpi = 0; vpi < visProvs.length; vpi++) {
+      var cityBounds = getCityBoundaries(visProvs[vpi]);
+      if (!cityBounds) continue;
+      
+      for (var cbi = 0; cbi < cityBounds.length; cbi++) {
+        var cb = cityBounds[cbi];
+        var isV = !!visited[cb.n];
+        var isHov = hoveredCity === cb.n;
+        
+        // Fill city area if visited or hovered
+        for (var gi = 0; gi < cb.p.length; gi++) {
+          var polygon = cb.p[gi];
+          for (var ri = 0; ri < polygon.length; ri++) {
+            var ring = polygon[ri];
+            ctx.beginPath();
+            for (var i = 0; i < ring.length; i++) {
+              var xy = lngLatToXY(ring[i][0], ring[i][1]);
+              var sxy = mapToScreen(xy[0], xy[1]);
+              if (i === 0) ctx.moveTo(sxy[0], sxy[1]);
+              else ctx.lineTo(sxy[0], sxy[1]);
+            }
+            ctx.closePath();
+            
+            if (isHov) {
+              ctx.fillStyle = isV ? 'rgba(240,160,96,0.25)' : 'rgba(100,120,160,0.2)';
+              ctx.fill();
+            } else if (isV) {
+              ctx.fillStyle = 'rgba(224,112,80,0.12)';
+              ctx.fill();
+            }
+          }
+        }
+        
+        // Draw city border
+        for (var gi = 0; gi < cb.p.length; gi++) {
+          var polygon = cb.p[gi];
+          for (var ri = 0; ri < polygon.length; ri++) {
+            var ring = polygon[ri];
+            ctx.beginPath();
+            for (var i = 0; i < ring.length; i++) {
+              var xy = lngLatToXY(ring[i][0], ring[i][1]);
+              var sxy = mapToScreen(xy[0], xy[1]);
+              if (i === 0) ctx.moveTo(sxy[0], sxy[1]);
+              else ctx.lineTo(sxy[0], sxy[1]);
+            }
+            ctx.closePath();
+            ctx.strokeStyle = isHov ? 'rgba(180,190,220,0.6)' : 'rgba(80,90,120,' + cityBorderAlpha + ')';
+            ctx.lineWidth = isHov ? 1.2 : 0.6;
+            ctx.stroke();
+          }
+        }
+      }
     }
   }
 

@@ -86,3 +86,98 @@ function getDecodedProvinces() {
   }
   return _decodedProvinces;
 }
+
+// ====== 城市边界按需加载 ======
+var PROV_ADCODE = {
+  '北京':110000,'天津':120000,'河北':130000,'山西':140000,'内蒙古':150000,
+  '辽宁':210000,'吉林':220000,'黑龙江':230000,'上海':310000,'江苏':320000,
+  '浙江':330000,'安徽':340000,'福建':350000,'江西':360000,'山东':370000,
+  '河南':410000,'湖北':420000,'湖南':430000,'广东':440000,'广西':450000,
+  '海南':460000,'重庆':500000,'四川':510000,'贵州':520000,'云南':530000,
+  '西藏':540000,'陕西':610000,'甘肃':620000,'青海':630000,'宁夏':640000,
+  '新疆':650000
+};
+
+// Cache: provName → { arcs: [], cities: [{n, c, t, a}] } (decoded polygons)
+var _cityBoundaryCache = {};
+var _cityBoundaryLoading = {}; // provName → true if loading
+
+function loadCityBoundaries(provName) {
+  if (_cityBoundaryCache[provName] || _cityBoundaryLoading[provName]) return;
+  var adcode = PROV_ADCODE[provName];
+  if (!adcode) return;
+  
+  _cityBoundaryLoading[provName] = true;
+  fetch('data/cities/' + adcode + '.json')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      // Decode city boundaries
+      var decoded = [];
+      for (var i = 0; i < data.cities.length; i++) {
+        var city = data.cities[i];
+        var polygons = decodeCityGeom(city, data.arcs);
+        decoded.push({
+          n: city.n,
+          c: city.c,
+          p: polygons
+        });
+      }
+      _cityBoundaryCache[provName] = decoded;
+      delete _cityBoundaryLoading[provName];
+      draw(); // Re-render with city boundaries
+    })
+    .catch(function() {
+      delete _cityBoundaryLoading[provName];
+    });
+}
+
+function decodeCityGeom(city, arcs) {
+  function decodeLocalArc(idx) {
+    if (idx >= 0) return arcs[idx];
+    return arcs[~idx].slice().reverse();
+  }
+  function decodeLocalRing(indices) {
+    var pts = [];
+    for (var i = 0; i < indices.length; i++) {
+      var arc = decodeLocalArc(indices[i]);
+      var start = (i === 0) ? 0 : 1;
+      for (var j = start; j < arc.length; j++) pts.push(arc[j]);
+    }
+    return pts;
+  }
+  
+  if (city.t === 'Polygon') {
+    var poly = [];
+    for (var i = 0; i < city.a.length; i++) poly.push(decodeLocalRing(city.a[i]));
+    return [poly];
+  } else if (city.t === 'MultiPolygon') {
+    var polys = [];
+    for (var i = 0; i < city.a.length; i++) {
+      var poly = [];
+      for (var j = 0; j < city.a[i].length; j++) poly.push(decodeLocalRing(city.a[i][j]));
+      polys.push(poly);
+    }
+    return polys;
+  }
+  return [];
+}
+
+function getCityBoundaries(provName) {
+  return _cityBoundaryCache[provName] || null;
+}
+
+// Get visible provinces at current zoom/pan
+function getVisibleProvinces() {
+  var visible = [];
+  var provs = getDecodedProvinces();
+  for (var i = 0; i < provs.length; i++) {
+    var c = provs[i].c;
+    if (!c) continue;
+    var sxy = mapToScreen(lngLatToXY(c[0], c[1])[0], lngLatToXY(c[0], c[1])[1]);
+    // Generous bounds check
+    if (sxy[0] > -W && sxy[0] < W * 2 && sxy[1] > -H && sxy[1] < H * 2) {
+      visible.push(provs[i].n);
+    }
+  }
+  return visible;
+}

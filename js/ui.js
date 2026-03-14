@@ -144,10 +144,6 @@ function toggleStats() {
 function showIOPanel() {
   document.getElementById('ioPanel').classList.add('show');
   document.getElementById('ioText').value = '';
-  // Show share button if Web Share API available
-  if (navigator.share) {
-    document.getElementById('shareBtn').style.display = 'inline-block';
-  }
 }
 function closeIOPanel() { document.getElementById('ioPanel').classList.remove('show'); }
 
@@ -289,18 +285,6 @@ function doImportCompact(text) {
   }
 }
 
-function shareData() {
-  var code = 'TM1:' + encodeBitmap() + encodeNotes();
-  var count = Object.keys(visited).length;
-  var provs = new Set(CITIES.filter(function(c) { return visited[c.n]; }).map(function(c) { return c.p; })).size;
-  navigator.share({
-    title: '我的中国旅行地图',
-    text: '🗺️ 我去过' + provs + '个省' + count + '座城市！\n\n' + code + '\n\n👉 https://jusaka.github.io/travel-map/'
-  }).then(function() {
-    showToast('📤 已分享！');
-  }).catch(function() {});
-}
-
 function exportData() {
   var data = { profileName: activeProfile, version: 2, visitedCities: visited, notes: {}, exportTime: new Date().toISOString() };
   for (var k in visited) {
@@ -370,9 +354,9 @@ function doImportOverwrite() {
 }
 
 // Share card
-function generateShareCard() {
+function shareMapImage() {
   closeIOPanel();
-  showToast('🖼️ 生成中...');
+  showToast('📤 生成中...');
 
   setTimeout(function() {
     var cardW = 800, cardH = 1000;
@@ -467,13 +451,36 @@ function generateShareCard() {
     cx.fillText('中国旅行地图 · ' + new Date().toLocaleDateString('zh-CN'), cardW / 2, cardH - 30);
 
     c.toBlob(function(blob) {
-      var a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = 'travel-map-share-' + new Date().toISOString().slice(0, 10) + '.png';
-      a.click();
-      showToast('🖼️ 分享卡已生成');
+      var file = new File([blob], 'travel-map.png', { type: 'image/png' });
+      
+      // Try Web Share API with file
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        navigator.share({
+          title: '我的中国旅行地图',
+          text: visitedProvs + '个省份 · ' + visitedCities + '座城市 · ' + rank,
+          files: [file]
+        }).then(function() {
+          showToast('📤 已分享！');
+        }).catch(function(e) {
+          if (e.name !== 'AbortError') {
+            // Fallback: download
+            downloadBlob(blob);
+          }
+        });
+      } else {
+        // Fallback: download for desktop browsers
+        downloadBlob(blob);
+      }
     });
   }, 100);
+}
+
+function downloadBlob(blob) {
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'travel-map-' + new Date().toISOString().slice(0, 10) + '.png';
+  a.click();
+  showToast('📤 图片已保存');
 }
 
 // Toast
