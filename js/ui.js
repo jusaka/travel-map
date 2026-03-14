@@ -16,8 +16,8 @@ function openCityModal(city) {
   document.getElementById('modalVisitBtn').style.display = isVisited ? 'none' : 'block';
   document.getElementById('modalUnvisit').style.display = isVisited ? 'block' : 'none';
   document.getElementById('modalSaveBtn').style.display = isVisited ? 'block' : 'none';
-  document.getElementById('modalNote').placeholder = isVisited ? '写点什么...你在这座城市的回忆' : '打卡后可以写备注~';
-  document.getElementById('modalNote').disabled = !isVisited;
+  document.getElementById('modalNote').placeholder = isVisited ? '写点什么...你在这座城市的回忆' : '可以顺便写点备注，打卡时一起保存~';
+  document.getElementById('modalNote').disabled = false;
 
   document.getElementById('cityModal').classList.add('show');
 }
@@ -29,12 +29,12 @@ function closeCityModal() {
 
 function visitCity() {
   if (!selectedCity) return;
-  visited[selectedCity.n] = { note: '', time: Date.now() };
+  var note = document.getElementById('modalNote').value || '';
+  visited[selectedCity.n] = { note: note, time: Date.now() };
   saveData();
   updateStats();
   showToast('✅ ' + selectedCity.n + ' 已打卡！');
-  // 刷新弹窗状态
-  openCityModal(selectedCity);
+  closeCityModal();
   draw();
 }
 

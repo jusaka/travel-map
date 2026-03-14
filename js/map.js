@@ -142,12 +142,14 @@ function draw() {
 // ====== Hit Testing ======
 function findCityAt(mx, my) {
   var closest = null, closestDist = Infinity;
+  // 手机上hit area需要更大，至少20px对应的地图距离
+  var hitPx = ('ontouchstart' in window) ? 28 : 16;
+  var hitR = hitPx / viewScale;
   for (var i = 0; i < CITIES.length; i++) {
     var city = CITIES[i];
     var xy = lngLatToXY(city.lng, city.lat);
     var dx = xy[0] - mx, dy = xy[1] - my;
     var dist = Math.sqrt(dx * dx + dy * dy);
-    var hitR = 12 / viewScale;
     if (dist < hitR && dist < closestDist) {
       closest = city;
       closestDist = dist;
