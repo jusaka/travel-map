@@ -93,6 +93,20 @@ function updateProfileBtn() {
   document.getElementById('profileBtnName').textContent = activeProfile;
 }
 
+function renameProfile() {
+  var newName = prompt('输入新用户名:', activeProfile);
+  if (!newName || newName.trim() === '' || newName.trim() === activeProfile) return;
+  newName = newName.trim();
+  if (profiles[newName]) { showToast('用户名已存在'); return; }
+  // Rename: create new key, delete old
+  profiles[newName] = profiles[activeProfile];
+  delete profiles[activeProfile];
+  activeProfile = newName;
+  saveProfiles();
+  updateProfileBtn();
+  showToast('✅ 已改名为「' + newName + '」');
+}
+
 function showProfileModal() {
   renderProfileList();
   document.getElementById('profileModal').classList.add('show');

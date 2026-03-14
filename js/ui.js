@@ -147,34 +147,76 @@ function showIOPanel() {
 }
 function closeIOPanel() { document.getElementById('ioPanel').classList.remove('show'); }
 
-// ====== 紧凑编码 ======
-// 格式: "TM1:" + base64(header + bitmap) + 备注(可选)
-// header: 2 bytes = city count (little-endian), 用于向前兼容
-// 362城市 → 2+46=48 bytes → base64 ≈ 64 chars
-// 解码时：如果保存的cityCount < 当前CITIES数组，多余的城市视为未打卡
-//         如果保存的cityCount > 当前CITIES数组，截断处理
+// ====== 紧凑编码 v2 ======
+// 格式: "TM2:" + base64(gzip(JSON))
+// JSON: { v: [adcode1, adcode2, ...], n: {adcode: "note", ...} }
+// 使用adcode而非索引，数据更新不会崩溃
+// 兼容旧格式 "TM1:" (bitmap based)
 
-function encodeBitmap() {
-  var cityCount = CITIES.length;
-  var bitmapLen = Math.ceil(cityCount / 8);
-  var buf = new Uint8Array(2 + bitmapLen);
-  // Header: city count (little-endian 16-bit)
-  buf[0] = cityCount & 0xFF;
-  buf[1] = (cityCount >> 8) & 0xFF;
-  for (var i = 0; i < cityCount; i++) {
-    if (visited[CITIES[i].n]) {
-      buf[2 + (i >> 3)] |= (1 << (i & 7));
-    }
-  }
+async function compressData(jsonStr) {
+  var blob = new Blob([jsonStr]);
+  var ds = new CompressionStream('gzip');
+  var stream = blob.stream().pipeThrough(ds);
+  var buf = await new Response(stream).arrayBuffer();
+  var bytes = new Uint8Array(buf);
   var binary = '';
-  for (var i = 0; i < buf.length; i++) {
-    binary += String.fromCharCode(buf[i]);
-  }
+  for (var i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
   return btoa(binary);
 }
 
-function decodeBitmap(b64) {
+async function decompressData(b64) {
   var binary = atob(b64);
+  var bytes = new Uint8Array(binary.length);
+  for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  var blob = new Blob([bytes]);
+  var ds = new DecompressionStream('gzip');
+  var stream = blob.stream().pipeThrough(ds);
+  return await new Response(stream).text();
+}
+
+function encodeVisited() {
+  var adcodes = [];
+  var notes = {};
+  for (var name in visited) {
+    var adcode = CITY_ADCODE[name];
+    if (!adcode) continue;
+    adcodes.push(adcode);
+    if (visited[name] && visited[name].note) {
+      notes[adcode] = visited[name].note;
+    }
+  }
+  var payload = { v: adcodes };
+  if (Object.keys(notes).length > 0) payload.n = notes;
+  return JSON.stringify(payload);
+}
+
+function decodeVisited(jsonStr) {
+  var data = JSON.parse(jsonStr);
+  var result = {};
+  var adcodes = data.v || [];
+  for (var i = 0; i < adcodes.length; i++) {
+    var name = ADCODE_CITY[adcodes[i]];
+    if (!name) continue;
+    result[name] = { note: '', time: Date.now() };
+    if (data.n && data.n[adcodes[i]]) {
+      result[name].note = data.n[adcodes[i]];
+    }
+  }
+  return result;
+}
+
+// Legacy TM1 decoder (backward compat)
+function decodeTM1(body) {
+  var notePart = '';
+  var pipeIdx = body.indexOf('|');
+  var bitmapB64;
+  if (pipeIdx >= 0) {
+    bitmapB64 = body.substring(0, pipeIdx);
+    notePart = body.substring(pipeIdx + 1);
+  } else {
+    bitmapB64 = body;
+  }
+  var binary = atob(bitmapB64);
   var result = {};
   if (binary.length < 2) return result;
   var savedCount = binary.charCodeAt(0) | (binary.charCodeAt(1) << 8);
@@ -187,44 +229,31 @@ function decodeBitmap(b64) {
       result[CITIES[i].n] = { note: '', time: Date.now() };
     }
   }
+  if (notePart) {
+    var parts = notePart.split(';');
+    for (var j = 0; j < parts.length; j++) {
+      var sep = parts[j].indexOf(':');
+      if (sep < 0) continue;
+      var idx = parseInt(parts[j].substring(0, sep));
+      var note = decodeURIComponent(parts[j].substring(sep + 1));
+      if (idx >= 0 && idx < CITIES.length && result[CITIES[idx].n]) {
+        result[CITIES[idx].n].note = note;
+      }
+    }
+  }
   return result;
 }
 
-function encodeNotes() {
-  var parts = [];
-  for (var i = 0; i < CITIES.length; i++) {
-    var v = visited[CITIES[i].n];
-    if (v && v.note) {
-      // URL-encode notes to handle special chars
-      parts.push(i + ':' + encodeURIComponent(v.note));
-    }
-  }
-  return parts.length ? '|' + parts.join(';') : '';
-}
-
-function decodeNotes(str, result) {
-  if (!str) return;
-  var parts = str.split(';');
-  for (var j = 0; j < parts.length; j++) {
-    var sep = parts[j].indexOf(':');
-    if (sep < 0) continue;
-    var idx = parseInt(parts[j].substring(0, sep));
-    var note = decodeURIComponent(parts[j].substring(sep + 1));
-    if (idx >= 0 && idx < CITIES.length && result[CITIES[idx].n]) {
-      result[CITIES[idx].n].note = note;
-    }
-  }
-}
-
-function exportCompact() {
-  var code = 'TM1:' + encodeBitmap() + encodeNotes();
+async function exportCompact() {
+  var jsonStr = encodeVisited();
+  var b64 = await compressData(jsonStr);
+  var code = 'TM2:' + b64;
   var textarea = document.getElementById('ioText');
   textarea.value = code;
   textarea.select();
-  // Try to copy
   if (navigator.clipboard) {
     navigator.clipboard.writeText(code).then(function() {
-      showToast('📋 已复制到剪贴板！');
+      showToast('📋 已复制到剪贴板！(' + code.length + '字符)');
     }).catch(function() {
       showToast('📋 已生成，请手动复制');
     });
@@ -237,10 +266,9 @@ function exportCompact() {
 function importCompact() {
   var text = document.getElementById('ioText').value.trim();
   if (!text) {
-    // Try to read from clipboard
     if (navigator.clipboard && navigator.clipboard.readText) {
       navigator.clipboard.readText().then(function(t) {
-        if (t && t.startsWith('TM1:')) {
+        if (t && (t.startsWith('TM2:') || t.startsWith('TM1:'))) {
           document.getElementById('ioText').value = t;
           doImportCompact(t);
         } else {
@@ -257,24 +285,18 @@ function importCompact() {
   doImportCompact(text);
 }
 
-function doImportCompact(text) {
-  if (!text.startsWith('TM1:')) {
-    showToast('❌ 无效的分享码');
-    return;
-  }
-  var body = text.substring(4);
-  var notePart = '';
-  var pipeIdx = body.indexOf('|');
-  var bitmapB64;
-  if (pipeIdx >= 0) {
-    bitmapB64 = body.substring(0, pipeIdx);
-    notePart = body.substring(pipeIdx + 1);
-  } else {
-    bitmapB64 = body;
-  }
+async function doImportCompact(text) {
   try {
-    var imported = decodeBitmap(bitmapB64);
-    decodeNotes(notePart, imported);
+    var imported;
+    if (text.startsWith('TM2:')) {
+      var jsonStr = await decompressData(text.substring(4));
+      imported = decodeVisited(jsonStr);
+    } else if (text.startsWith('TM1:')) {
+      imported = decodeTM1(text.substring(4));
+    } else {
+      showToast('❌ 无效的分享码');
+      return;
+    }
     var count = Object.keys(imported).length;
     pendingImportData = { visited: imported, profileName: '' };
     document.getElementById('importOverwriteName').textContent = activeProfile;
