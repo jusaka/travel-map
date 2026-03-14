@@ -55,6 +55,7 @@ function switchProfile(name) {
   updateProfileBtn();
   updateStats();
   draw();
+  renderProfileList();
   showToast('👤 已切换到「' + name + '」');
 }
 
@@ -93,17 +94,17 @@ function updateProfileBtn() {
   document.getElementById('profileBtnName').textContent = activeProfile;
 }
 
-function renameProfile() {
-  var newName = prompt('输入新用户名:', activeProfile);
-  if (!newName || newName.trim() === '' || newName.trim() === activeProfile) return;
+function renameProfile(name) {
+  var newName = prompt('输入新用户名:', name);
+  if (!newName || newName.trim() === '' || newName.trim() === name) return;
   newName = newName.trim();
   if (profiles[newName]) { showToast('用户名已存在'); return; }
-  // Rename: create new key, delete old
-  profiles[newName] = profiles[activeProfile];
-  delete profiles[activeProfile];
-  activeProfile = newName;
+  profiles[newName] = profiles[name];
+  delete profiles[name];
+  if (activeProfile === name) activeProfile = newName;
   saveProfiles();
   updateProfileBtn();
+  renderProfileList();
   showToast('✅ 已改名为「' + newName + '」');
 }
 
@@ -118,15 +119,20 @@ function closeProfileModal() {
 
 function renderProfileList() {
   var list = document.getElementById('profileList');
-  list.innerHTML = Object.keys(profiles).map(function(name) {
+  var names = Object.keys(profiles);
+  list.innerHTML = names.map(function(name) {
     var data = profiles[name]?.visitedCities || {};
     var count = Object.keys(data).length;
     var provs = new Set(CITIES.filter(function(c) { return data[c.n]; }).map(function(c) { return c.p; })).size;
     var isActive = name === activeProfile;
-    return '<div class="profile-item ' + (isActive ? 'active' : '') + '" onclick="switchProfile(\'' + name.replace(/'/g, "\\'") + '\')">' +
-      '<div><div class="pi-name">' + (isActive ? '✅ ' : '') + name + '</div>' +
+    var esc = name.replace(/'/g, "\\'");
+    return '<div class="profile-item ' + (isActive ? 'active' : '') + '" onclick="switchProfile(\'' + esc + '\')">' +
+      '<div style="flex:1;min-width:0"><div class="pi-name">' + (isActive ? '✅ ' : '') + name + '</div>' +
       '<div class="pi-stats">' + provs + '省 · ' + count + '城市</div></div>' +
-      (Object.keys(profiles).length > 1 ? '<button class="pi-del" onclick="event.stopPropagation();deleteProfile(\'' + name.replace(/'/g, "\\'") + '\')" title="删除">🗑️</button>' : '') +
+      '<div style="display:flex;gap:4px;align-items:center;flex-shrink:0">' +
+        '<button class="pi-action" onclick="event.stopPropagation();renameProfile(\'' + esc + '\')" title="改名">✏️</button>' +
+        (names.length > 1 ? '<button class="pi-action pi-del" onclick="event.stopPropagation();deleteProfile(\'' + esc + '\')" title="删除">🗑️</button>' : '') +
+      '</div>' +
     '</div>';
   }).join('');
 }
