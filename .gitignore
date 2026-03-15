@@ -1,3 +1,9 @@
-*.png
+# Debug/test screenshots
+debug*.png
+final*.png
+mobile*.png
+preview*.png
+test*.png
+# Large source files
 china.topojson
 china_simplified.json
