@@ -42,6 +42,7 @@ function resetView() {
   var mapH = viewScale / mapAspect;
   viewX = (W - mapW) / 2;
   viewY = topOffset + (availH - mapH) / 2;
+  updateZoomLevel();
   draw();
 }
 
@@ -54,6 +55,16 @@ function setupModalEvents() {
   });
   document.getElementById('importChoiceModal').addEventListener('click', function(e) {
     if (e.target === e.currentTarget) closeImportChoice();
+  });
+  document.getElementById('confirmModal').addEventListener('click', function(e) {
+    if (e.target === e.currentTarget) doConfirmCancel();
+  });
+  document.getElementById('promptModal').addEventListener('click', function(e) {
+    if (e.target === e.currentTarget) doPromptCancel();
+  });
+  // Enter key submits prompt
+  document.getElementById('promptInput').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') doPromptOk();
   });
 }
 

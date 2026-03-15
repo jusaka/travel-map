@@ -209,7 +209,7 @@ function setupEvents() {
 
 // ====== 缩放工具函数 ======
 function zoomAt(cx, cy, factor) {
-  var minScale = baseScale * 0.5;
+  var minScale = baseScale;
   var maxScale = baseScale * 50;
   var newScale = Math.max(minScale, Math.min(maxScale, viewScale * factor));
   var ratio = newScale / viewScale;

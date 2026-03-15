@@ -50,13 +50,49 @@ function saveCityNote() {
 
 function unvisitCity() {
   if (!selectedCity) return;
-  if (!confirm('确定取消「' + selectedCity.n + '」的打卡记录吗？')) return;
-  delete visited[selectedCity.n];
-  saveData();
-  updateStats();
-  showToast('❌ ' + selectedCity.n + ' 已取消打卡');
-  closeCityModal();
-  draw();
+  showConfirm('确定取消「' + selectedCity.n + '」的打卡记录吗？', function() {
+    delete visited[selectedCity.n];
+    saveData();
+    updateStats();
+    showToast('❌ ' + selectedCity.n + ' 已取消打卡');
+    closeCityModal();
+    draw();
+  });
+}
+
+// Generic confirm modal (replaces native confirm())
+var _confirmCallback = null;
+function showConfirm(msg, onOk) {
+  _confirmCallback = onOk;
+  document.getElementById('confirmMsg').textContent = msg;
+  document.getElementById('confirmModal').classList.add('show');
+}
+function doConfirmOk() {
+  document.getElementById('confirmModal').classList.remove('show');
+  if (_confirmCallback) { _confirmCallback(); _confirmCallback = null; }
+}
+function doConfirmCancel() {
+  document.getElementById('confirmModal').classList.remove('show');
+  _confirmCallback = null;
+}
+
+// Generic prompt modal (replaces native prompt())
+var _promptCallback = null;
+function showPrompt(msg, defaultVal, onOk) {
+  _promptCallback = onOk;
+  document.getElementById('promptMsg').textContent = msg;
+  document.getElementById('promptInput').value = defaultVal || '';
+  document.getElementById('promptModal').classList.add('show');
+  setTimeout(function() { document.getElementById('promptInput').focus(); }, 50);
+}
+function doPromptOk() {
+  var val = document.getElementById('promptInput').value.trim();
+  document.getElementById('promptModal').classList.remove('show');
+  if (_promptCallback && val) { _promptCallback(val); _promptCallback = null; }
+}
+function doPromptCancel() {
+  document.getElementById('promptModal').classList.remove('show');
+  _promptCallback = null;
 }
 
 // Mode
@@ -360,8 +396,18 @@ function doImportAsNewUser() {
   if (!pendingImportData) return;
   var name = pendingImportData.profileName;
   if (!name || profiles[name]) {
-    name = prompt('输入新用户名：', name || '导入用户');
-    if (!name) { closeImportChoice(); return; }
+    closeImportChoice();
+    showPrompt('输入新用户名：', name || '导入用户', function(inputName) {
+      var finalName = inputName;
+      var i = 1;
+      while (profiles[finalName]) { finalName = inputName + '_' + (i++); }
+      profiles[finalName] = { visitedCities: pendingImportData.visited };
+      saveProfiles();
+      switchProfile(finalName);
+      showToast('📤 已导入为新用户「' + finalName + '」，' + Object.keys(pendingImportData.visited).length + ' 座城市');
+      pendingImportData = null;
+    });
+    return;
   }
   var finalName = name;
   var i = 1;

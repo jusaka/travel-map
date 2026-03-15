@@ -76,18 +76,19 @@ function createProfile(nameOverride) {
 
 function deleteProfile(name) {
   if (Object.keys(profiles).length <= 1) { showToast('至少保留一个用户'); return; }
-  if (!confirm('确定删除用户「' + name + '」？数据不可恢复！')) return;
-  delete profiles[name];
-  if (activeProfile === name) {
-    activeProfile = Object.keys(profiles)[0];
-    visited = profiles[activeProfile]?.visitedCities || {};
-  }
-  saveProfiles();
-  updateProfileBtn();
-  updateStats();
-  draw();
-  renderProfileList();
-  showToast('🗑️ 已删除「' + name + '」');
+  showConfirm('确定删除用户「' + name + '」？数据不可恢复！', function() {
+    delete profiles[name];
+    if (activeProfile === name) {
+      activeProfile = Object.keys(profiles)[0];
+      visited = profiles[activeProfile]?.visitedCities || {};
+    }
+    saveProfiles();
+    updateProfileBtn();
+    updateStats();
+    draw();
+    renderProfileList();
+    showToast('🗑️ 已删除「' + name + '」');
+  });
 }
 
 function updateProfileBtn() {
@@ -95,17 +96,17 @@ function updateProfileBtn() {
 }
 
 function renameProfile(name) {
-  var newName = prompt('输入新用户名:', name);
-  if (!newName || newName.trim() === '' || newName.trim() === name) return;
-  newName = newName.trim();
-  if (profiles[newName]) { showToast('用户名已存在'); return; }
-  profiles[newName] = profiles[name];
-  delete profiles[name];
-  if (activeProfile === name) activeProfile = newName;
-  saveProfiles();
-  updateProfileBtn();
-  renderProfileList();
-  showToast('✅ 已改名为「' + newName + '」');
+  showPrompt('输入新用户名:', name, function(newName) {
+    if (newName === name) return;
+    if (profiles[newName]) { showToast('用户名已存在'); return; }
+    profiles[newName] = profiles[name];
+    delete profiles[name];
+    if (activeProfile === name) activeProfile = newName;
+    saveProfiles();
+    updateProfileBtn();
+    renderProfileList();
+    showToast('✏️ 已改名为「' + newName + '」');
+  });
 }
 
 function showProfileModal() {
@@ -117,6 +118,10 @@ function closeProfileModal() {
   document.getElementById('profileModal').classList.remove('show');
 }
 
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
 function renderProfileList() {
   var list = document.getElementById('profileList');
   var names = Object.keys(profiles);
@@ -125,9 +130,10 @@ function renderProfileList() {
     var count = Object.keys(data).length;
     var provs = new Set(CITIES.filter(function(c) { return data[c.n]; }).map(function(c) { return c.p; })).size;
     var isActive = name === activeProfile;
-    var esc = name.replace(/'/g, "\\'");
+    var esc = name.replace(/'/g, "\\'").replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    var display = escHtml(name);
     return '<div class="profile-item ' + (isActive ? 'active' : '') + '" onclick="switchProfile(\'' + esc + '\')">' +
-      '<div style="flex:1;min-width:0"><div class="pi-name">' + (isActive ? '✅ ' : '') + name + '</div>' +
+      '<div style="flex:1;min-width:0"><div class="pi-name">' + (isActive ? '✅ ' : '') + display + '</div>' +
       '<div class="pi-stats">' + provs + '省 · ' + count + '城市</div></div>' +
       '<div style="display:flex;gap:4px;align-items:center;flex-shrink:0">' +
         '<button class="pi-action" onclick="event.stopPropagation();renameProfile(\'' + esc + '\')" title="改名">✏️</button>' +

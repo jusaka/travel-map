@@ -224,6 +224,27 @@ canvas{display:block;width:100%;height:100%}
   </div>
 </div>
 
+<div class="modal-overlay" id="confirmModal">
+  <div class="modal" style="max-width:320px">
+    <p id="confirmMsg" style="margin:0 0 20px;font-size:14px;line-height:1.6"></p>
+    <div class="modal-btns">
+      <button class="btn-secondary" onclick="doConfirmCancel()">取消</button>
+      <button class="btn-danger" onclick="doConfirmOk()">确定</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="promptModal">
+  <div class="modal" style="max-width:320px">
+    <p id="promptMsg" style="margin:0 0 12px;font-size:14px"></p>
+    <input id="promptInput" type="text" maxlength="20" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:14px;box-sizing:border-box">
+    <div class="modal-btns" style="margin-top:16px">
+      <button class="btn-secondary" onclick="doPromptCancel()">取消</button>
+      <button class="btn-primary" onclick="doPromptOk()">确定</button>
+    </div>
+  </div>
+</div>
+
 <script src="js/data.js"></script>
 <script src="js/adcode.js"></script>
 <script src="js/topo_data.js"></script>
