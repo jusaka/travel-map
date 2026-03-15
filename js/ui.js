@@ -395,28 +395,28 @@ function closeImportChoice() {
 function doImportAsNewUser() {
   if (!pendingImportData) return;
   var name = pendingImportData.profileName;
+  var importedData = pendingImportData.visited;
   if (!name || profiles[name]) {
     closeImportChoice();
     showPrompt('输入新用户名：', name || '导入用户', function(inputName) {
       var finalName = inputName;
       var i = 1;
       while (profiles[finalName]) { finalName = inputName + '_' + (i++); }
-      profiles[finalName] = { visitedCities: pendingImportData.visited };
+      profiles[finalName] = { visitedCities: importedData };
       saveProfiles();
       switchProfile(finalName);
-      showToast('📤 已导入为新用户「' + finalName + '」，' + Object.keys(pendingImportData.visited).length + ' 座城市');
-      pendingImportData = null;
+      showToast('📤 已导入为新用户「' + finalName + '」，' + Object.keys(importedData).length + ' 座城市');
     });
     return;
   }
   var finalName = name;
   var i = 1;
   while (profiles[finalName]) { finalName = name + '_' + (i++); }
-  profiles[finalName] = { visitedCities: pendingImportData.visited };
+  profiles[finalName] = { visitedCities: importedData };
   saveProfiles();
   switchProfile(finalName);
   closeImportChoice();
-  showToast('📤 已导入为新用户「' + finalName + '」，' + Object.keys(pendingImportData.visited).length + ' 座城市');
+  showToast('📤 已导入为新用户「' + finalName + '」，' + Object.keys(importedData).length + ' 座城市');
 }
 
 function doImportOverwrite() {
